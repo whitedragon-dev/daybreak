@@ -5,6 +5,9 @@ contextBridge.exposeInMainWorld('api', {
   createTab: (url) => ipcRenderer.invoke('tabs:create', url),
   switchTab: (id) => ipcRenderer.invoke('tabs:switch', id),
   closeTab: (id) => ipcRenderer.invoke('tabs:close', id),
+  closeOtherTabs: (id) => ipcRenderer.invoke('tabs:closeOthers', id),
+  duplicateTab: (id) => ipcRenderer.invoke('tabs:duplicate', id),
+  togglePinTab: (id) => ipcRenderer.invoke('tabs:togglePin', id),
 
   // navigation
   navigate: (id, url) => ipcRenderer.invoke('nav:go', { id, url }),

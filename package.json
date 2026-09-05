@@ -1,7 +1,8 @@
 {
-  "name": "minimal-electron-browser",
+  "name": "daybreak",
+  "productName": "Daybreak",
   "version": "1.0.0",
-  "description": "Minimal multi-tab Electron browser shell using BaseWindow + WebContentsView.",
+  "description": "Daybreak — a minimal multi-tab Electron browser shell using BaseWindow + WebContentsView.",
   "main": "main.js",
   "private": true,
   "scripts": {
