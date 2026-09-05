@@ -1,0 +1,399 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-size: 12px;
+    -webkit-user-select: none;
+    user-select: none;
+    color: #202124;
+  }
+
+  #toolbar {
+    height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    background: #f1f3f4;
+    border-bottom: 1px solid #dadce0;
+    -webkit-app-region: drag;
+    box-sizing: border-box;
+  }
+
+  #toolbar button,
+  #toolbar input,
+  #tabstrip,
+  #bookmarksBar {
+    -webkit-app-region: no-drag;
+  }
+
+  /* ---- tab strip ---- */
+  #tabstrip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 42%;
+    overflow-x: auto;
+    height: 30px;
+    scrollbar-width: none;
+  }
+  #tabstrip::-webkit-scrollbar { display: none; }
+
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: transparent;
+    color: #5f6368;
+    cursor: pointer;
+    flex-shrink: 0;
+    max-width: 140px;
+    min-width: 60px;
+    border: 1px solid transparent;
+  }
+  .tab:hover { background: #e8eaed; }
+  .tab.active {
+    background: #ffffff;
+    color: #202124;
+    border-color: #dadce0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+  .tab .tab-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    pointer-events: none;
+  }
+  .tab .tab-close {
+    width: 14px;
+    height: 14px;
+    line-height: 14px;
+    text-align: center;
+    border-radius: 3px;
+    color: inherit;
+    opacity: 0.6;
+    flex-shrink: 0;
+  }
+  .tab .tab-close:hover { opacity: 1; background: rgba(0,0,0,0.08); }
+
+  #newTabBtn {
+    width: 24px; height: 24px; flex-shrink: 0; border: none; border-radius: 5px;
+    background: transparent; color: #5f6368; cursor: pointer; font-size: 15px; line-height: 1;
+  }
+  #newTabBtn:hover { background: #e8eaed; }
+
+  .divider { width: 1px; height: 20px; background: #dadce0; flex-shrink: 0; }
+
+  #navbtns { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  #navbtns button, #starBtn, #menuBtn {
+    width: 26px; height: 26px; border: none; border-radius: 5px; background: transparent;
+    color: #5f6368; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  #navbtns button:hover:not(:disabled), #starBtn:hover, #menuBtn:hover { background: #e8eaed; }
+  #navbtns button:disabled { opacity: 0.3; cursor: default; }
+  #starBtn.active { color: #1a73e8; }
+
+  #urlbar {
+    flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 1px solid #dadce0;
+    border-radius: 14px; background: #ffffff; color: #202124; outline: none; font-size: 12px;
+  }
+  #urlbar:focus { border-color: #1a73e8; }
+
+  /* ---- window controls ---- */
+  #winctrls { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
+  #winctrls button {
+    width: 32px; height: 32px; border: none; background: transparent; color: #5f6368;
+    cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center;
+  }
+  #winctrls button:hover { background: #e8eaed; }
+  #closeWinBtn:hover { background: #e81123; color: #fff; }
+
+  /* ---- bookmarks bar ---- */
+  #bookmarksBar {
+    height: 32px;
+    display: none;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    background: #ffffff;
+    border-bottom: 1px solid #dadce0;
+    overflow-x: auto;
+    -webkit-app-region: drag;
+  }
+  #bookmarksBar.show { display: flex; }
+  #bookmarksBar::-webkit-scrollbar { display: none; }
+  .bm-chip {
+    display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px;
+    font-size: 11px; color: #202124; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  }
+  .bm-chip:hover { background: #f1f3f4; }
+  .bm-empty { font-size: 11px; color: #9aa0a6; padding: 0 4px; }
+
+  /* ---- menu dropdown ---- */
+  #menuDropdown {
+    position: fixed;
+    right: 40px;
+    background: #ffffff;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    min-width: 200px;
+    z-index: 9999;
+    display: none;
+    padding: 6px 0;
+  }
+  #menuDropdown.show { display: block; }
+  .menu-item {
+    padding: 9px 14px; font-size: 12px; color: #202124; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .menu-item:hover { background: #f1f3f4; }
+  .menu-divider { height: 1px; background: #dadce0; margin: 4px 0; }
+</style>
+</head>
+<body>
+  <div id="toolbar">
+    <div id="tabstrip"></div>
+    <button id="newTabBtn" title="New tab">+</button>
+    <div class="divider"></div>
+    <div id="navbtns">
+      <button id="backBtn" title="Back">&#8592;</button>
+      <button id="fwdBtn" title="Forward">&#8594;</button>
+      <button id="reloadBtn" title="Reload">&#8635;</button>
+    </div>
+    <input id="urlbar" type="text" spellcheck="false" placeholder="Search or enter address">
+    <button id="starBtn" title="Bookmark this page">&#9733;</button>
+    <button id="menuBtn" title="Menu">&#8942;</button>
+    <div class="divider"></div>
+    <div id="winctrls">
+      <button id="minBtn" title="Minimize">&#8212;</button>
+      <button id="maxBtn" title="Maximize">&#9723;</button>
+      <button id="closeWinBtn" title="Close">&#10005;</button>
+    </div>
+  </div>
+
+  <div id="bookmarksBar"></div>
+
+  <div id="menuDropdown">
+    <div class="menu-item" id="menuNewTab">New tab<span>Ctrl+T</span></div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" id="menuBookmarks">Bookmarks</div>
+    <div class="menu-item" id="menuHistory">History</div>
+    <div class="menu-item" id="menuSettings">Settings</div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" id="menuToggleBar">Show bookmarks bar<span id="menuBarCheck"></span></div>
+  </div>
+
+<script>
+(function () {
+  var state = { activeId: null, tabs: [], settings: {} };
+  var editingUrl = false;
+
+  var tabstrip = document.getElementById('tabstrip');
+  var urlbar = document.getElementById('urlbar');
+  var backBtn = document.getElementById('backBtn');
+  var fwdBtn = document.getElementById('fwdBtn');
+  var reloadBtn = document.getElementById('reloadBtn');
+  var newTabBtn = document.getElementById('newTabBtn');
+  var starBtn = document.getElementById('starBtn');
+  var menuBtn = document.getElementById('menuBtn');
+  var menuDropdown = document.getElementById('menuDropdown');
+  var bookmarksBar = document.getElementById('bookmarksBar');
+  var minBtn = document.getElementById('minBtn');
+  var maxBtn = document.getElementById('maxBtn');
+  var closeWinBtn = document.getElementById('closeWinBtn');
+
+  function activeTab() {
+    return state.tabs.find(function (t) { return t.id === state.activeId; }) || null;
+  }
+
+  function renderTabs() {
+    tabstrip.innerHTML = '';
+    state.tabs.forEach(function (tab) {
+      var el = document.createElement('div');
+      el.className = 'tab' + (tab.id === state.activeId ? ' active' : '');
+      el.title = tab.url;
+
+      var titleEl = document.createElement('span');
+      titleEl.className = 'tab-title';
+      titleEl.textContent = tab.loading ? 'Loading…' : (tab.title || 'New Tab');
+      el.appendChild(titleEl);
+
+      var closeEl = document.createElement('span');
+      closeEl.className = 'tab-close';
+      closeEl.textContent = '\u00d7';
+      closeEl.addEventListener('click', function (e) {
+        e.stopPropagation();
+        window.api.closeTab(tab.id);
+      });
+      el.appendChild(closeEl);
+
+      el.addEventListener('click', function () { window.api.switchTab(tab.id); });
+      tabstrip.appendChild(el);
+    });
+  }
+
+  function renderToolbarState() {
+    var active = activeTab();
+    if (active) {
+      if (!editingUrl) urlbar.value = active.url === 'browser://newtab' ? '' : active.url;
+      backBtn.disabled = !active.canGoBack;
+      fwdBtn.disabled = !active.canGoForward;
+      starBtn.classList.toggle('active', !!active.bookmarked);
+    } else {
+      if (!editingUrl) urlbar.value = '';
+      backBtn.disabled = true;
+      fwdBtn.disabled = true;
+      starBtn.classList.remove('active');
+    }
+  }
+
+  function renderBookmarksBarVisibility() {
+    var show = !!(state.settings && state.settings.showBookmarksBar);
+    bookmarksBar.classList.toggle('show', show);
+    document.getElementById('menuBarCheck').textContent = show ? '\u2713' : '';
+    document.body.style.height = (42 + (show ? 32 : 0)) + 'px';
+  }
+
+  function refreshBookmarksBar() {
+    window.api.getBookmarks().then(function (list) {
+      bookmarksBar.innerHTML = '';
+      if (!list.length) {
+        var empty = document.createElement('span');
+        empty.className = 'bm-empty';
+        empty.textContent = 'Bookmarks you save will appear here';
+        bookmarksBar.appendChild(empty);
+        return;
+      }
+      list.forEach(function (b) {
+        var chip = document.createElement('div');
+        chip.className = 'bm-chip';
+        chip.textContent = b.title || b.url;
+        chip.title = b.url;
+        chip.addEventListener('click', function () {
+          if (state.activeId) window.api.navigate(state.activeId, b.url);
+        });
+        bookmarksBar.appendChild(chip);
+      });
+    });
+  }
+
+  function render() {
+    renderTabs();
+    renderToolbarState();
+    renderBookmarksBarVisibility();
+    refreshBookmarksBar();
+  }
+
+  window.api.onUpdate(function (newState) {
+    state = newState;
+    render();
+  });
+
+  window.api.onWinState(function (winState) {
+    maxBtn.innerHTML = winState.maximized ? '&#10064;' : '&#9723;';
+    maxBtn.title = winState.maximized ? 'Restore' : 'Maximize';
+  });
+
+  window.api.onFocusUrlbar(function () {
+    urlbar.focus();
+    urlbar.select();
+  });
+
+  // ---- tab actions ----
+  newTabBtn.addEventListener('click', function () { window.api.createTab(); });
+  backBtn.addEventListener('click', function () { if (state.activeId) window.api.goBack(state.activeId); });
+  fwdBtn.addEventListener('click', function () { if (state.activeId) window.api.goForward(state.activeId); });
+  reloadBtn.addEventListener('click', function () { if (state.activeId) window.api.reload(state.activeId); });
+
+  starBtn.addEventListener('click', function () {
+    var active = activeTab();
+    if (!active) return;
+    if (active.bookmarked) {
+      window.api.removeBookmarkByUrl(active.url);
+    } else {
+      window.api.addBookmark(active.url, active.title);
+    }
+  });
+
+  urlbar.addEventListener('focus', function () { editingUrl = true; });
+  urlbar.addEventListener('blur', function () { editingUrl = false; renderToolbarState(); });
+  urlbar.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      if (state.activeId) window.api.navigate(state.activeId, urlbar.value);
+      urlbar.blur();
+    } else if (e.key === 'Escape') {
+      urlbar.blur();
+    }
+  });
+
+  // ---- window controls ----
+  minBtn.addEventListener('click', function () { window.api.minimizeWindow(); });
+  maxBtn.addEventListener('click', function () { window.api.maximizeWindow(); });
+  closeWinBtn.addEventListener('click', function () { window.api.closeWindow(); });
+
+  // ---- menu ----
+  function openMenu() {
+    var rect = menuBtn.getBoundingClientRect();
+    menuDropdown.style.top = (rect.bottom + 4) + 'px';
+    menuDropdown.classList.add('show');
+    // Reserve enough extra height for the dropdown to paint fully instead of
+    // being clipped at the overlay's normal (toolbar-only) bounds.
+    window.api.setOverlayExtra(280);
+  }
+  function closeMenu() {
+    menuDropdown.classList.remove('show');
+    window.api.setOverlayExtra(0);
+  }
+
+  menuBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (menuDropdown.classList.contains('show')) closeMenu(); else openMenu();
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#menuDropdown') && !e.target.closest('#menuBtn')) {
+      closeMenu();
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeMenu();
+  });
+
+  document.getElementById('menuNewTab').addEventListener('click', function () {
+    window.api.createTab();
+    closeMenu();
+  });
+  document.getElementById('menuBookmarks').addEventListener('click', function () {
+    if (state.activeId) window.api.navigate(state.activeId, 'browser://bookmarks');
+    closeMenu();
+  });
+  document.getElementById('menuHistory').addEventListener('click', function () {
+    if (state.activeId) window.api.navigate(state.activeId, 'browser://history');
+    closeMenu();
+  });
+  document.getElementById('menuSettings').addEventListener('click', function () {
+    if (state.activeId) window.api.navigate(state.activeId, 'browser://settings');
+    closeMenu();
+  });
+  document.getElementById('menuToggleBar').addEventListener('click', function () {
+    var current = !!(state.settings && state.settings.showBookmarksBar);
+    window.api.setSettings({ showBookmarksBar: !current });
+    closeMenu();
+  });
+})();
+</script>
+</body>
+</html>
