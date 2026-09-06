@@ -1,10 +1,11 @@
-const { app, BaseWindow, WebContentsView, ipcMain, protocol, session, shell } = require('electron');
+const { app, BaseWindow, WebContentsView, ipcMain, protocol, session, shell, Menu, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
 const pages = require('./pages.js');
 
-const BASE_TOPBAR_HEIGHT = 42;
+const TAB_ROW_HEIGHT = 36;
+const NAV_ROW_HEIGHT = 40;
 const BOOKMARKS_BAR_HEIGHT = 32;
 let overlayExtra = 0; // extra height temporarily reserved for floating UI (menu / tab context menu)
 
@@ -57,7 +58,7 @@ function saveSettings() { saveJSON('settings.json', settings); }
 // ---------------- layout ----------------
 
 function chromeHeight() {
-  return BASE_TOPBAR_HEIGHT + (settings.showBookmarksBar ? BOOKMARKS_BAR_HEIGHT : 0);
+  return TAB_ROW_HEIGHT + NAV_ROW_HEIGHT + (settings.showBookmarksBar ? BOOKMARKS_BAR_HEIGHT : 0);
 }
 
 function overlayBoundsHeight() {
@@ -152,6 +153,74 @@ function resolveInput(input) {
   return base + encodeURIComponent(trimmed);
 }
 
+// ---------------- context menu (page content) ----------------
+
+function buildPageContextMenu(wc, params) {
+  const template = [];
+  const editable = params.isEditable;
+  const selection = (params.selectionText || '').trim();
+  const hasSelection = !!selection;
+  const hasLink = !!params.linkURL;
+  const isImage = params.mediaType === 'image';
+
+  if (editable) {
+    template.push(
+      { label: 'Cut', role: 'cut', enabled: params.editFlags.canCut },
+      { label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy },
+      { label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste },
+      { type: 'separator' },
+      { label: 'Select all', role: 'selectAll' }
+    );
+  } else if (hasSelection) {
+    const short = selection.length > 40 ? selection.slice(0, 40) + '\u2026' : selection;
+    template.push(
+      { label: 'Copy', role: 'copy' },
+      { label: 'Search for \u201c' + short + '\u201d', click: () => createTab(resolveInput(selection)) }
+    );
+  }
+
+  if (hasLink) {
+    if (template.length) template.push({ type: 'separator' });
+    template.push(
+      { label: 'Open link in new tab', click: () => createTab(params.linkURL) },
+      { label: 'Copy link address', click: () => clipboard.writeText(params.linkURL) }
+    );
+  }
+
+  if (isImage) {
+    if (template.length) template.push({ type: 'separator' });
+    template.push(
+      { label: 'Open image in new tab', click: () => createTab(params.srcURL) },
+      { label: 'Save image as\u2026', click: () => wc.downloadURL(params.srcURL) },
+      { label: 'Copy image address', click: () => clipboard.writeText(params.srcURL) }
+    );
+  }
+
+  if (!editable && !hasSelection && !hasLink && !isImage) {
+    template.push(
+      { label: 'Back', enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
+      { label: 'Forward', enabled: wc.navigationHistory.canGoForward(), click: () => wc.navigationHistory.goForward() },
+      { label: 'Reload', click: () => wc.reload() },
+      { type: 'separator' },
+      { label: 'Save page as\u2026', click: () => wc.downloadURL(wc.getURL()) },
+      { label: 'Print\u2026', click: () => wc.print() }
+    );
+  }
+
+  template.push(
+    { type: 'separator' },
+    {
+      label: 'Inspect',
+      click: () => {
+        wc.inspectElement(params.x, params.y);
+        if (!wc.isDevToolsOpened()) wc.openDevTools({ mode: 'detach' });
+      }
+    }
+  );
+
+  return Menu.buildFromTemplate(template);
+}
+
 // ---------------- tabs ----------------
 
 function createTab(url, opts) {
@@ -210,6 +279,7 @@ function createTab(url, opts) {
   });
 
   wc.on('before-input-event', (_e, input) => handleShortcut(input, id));
+  wc.on('context-menu', (_e, params) => { buildPageContextMenu(wc, params).popup({ window: win }); });
 
   wc.loadURL(normalizeUrl(initialUrl));
 
@@ -305,6 +375,22 @@ function createWindow() {
   overlayView.setBackgroundColor('#00000000');
   overlayView.webContents.loadFile(path.join(__dirname, 'index.html'));
   overlayView.webContents.on('before-input-event', (_e, input) => handleShortcut(input, null));
+  overlayView.webContents.on('context-menu', (_e, params) => {
+    // The tab-strip's own right-click menu is custom HTML and already calls
+    // preventDefault() in the renderer, so this never fires for tabs — only
+    // for genuinely editable/selectable overlay elements like the address bar.
+    if (params.isEditable) {
+      Menu.buildFromTemplate([
+        { label: 'Cut', role: 'cut', enabled: params.editFlags.canCut },
+        { label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy },
+        { label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste },
+        { type: 'separator' },
+        { label: 'Select all', role: 'selectAll' }
+      ]).popup({ window: win });
+    } else if ((params.selectionText || '').trim()) {
+      Menu.buildFromTemplate([{ label: 'Copy', role: 'copy' }]).popup({ window: win });
+    }
+  });
 
   win.on('resize', layout);
   win.on('maximize', pushWinState);

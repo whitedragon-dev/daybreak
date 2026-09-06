@@ -7,7 +7,7 @@
 
   :root {
     --bg: #ffffff;
-    --bar: #f1f3f4;
+    --tabbar: #dee1e6;
     --text: #202124;
     --text-dim: #5f6368;
     --border: #dadce0;
@@ -15,8 +15,8 @@
     --hover: #e8eaed;
   }
   body.dark {
-    --bg: #202124;
-    --bar: #292a2d;
+    --bg: #232427;
+    --tabbar: #17181a;
     --text: #e8eaed;
     --text-dim: #9aa0a6;
     --border: #3c4043;
@@ -36,37 +36,32 @@
     color: var(--text);
   }
 
-  #toolbar {
-    height: 42px;
+  /* =============== tab row (top) =============== */
+  #tabRow {
+    height: 36px;
     display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 8px;
-    background: var(--bar);
-    border-bottom: 1px solid var(--border);
+    align-items: flex-end;
+    gap: 2px;
+    padding: 6px 6px 0;
+    background: var(--tabbar);
     -webkit-app-region: drag;
     box-sizing: border-box;
   }
 
-  #toolbar button,
-  #toolbar input,
-  #tabstrip,
-  #bookmarksBar {
-    -webkit-app-region: no-drag;
-  }
+  #tabRow button, #tabstrip, #winctrls { -webkit-app-region: no-drag; }
 
   #logo {
-    width: 15px; height: 15px; flex-shrink: 0; border-radius: 50%;
+    width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%;
     border: 2px solid var(--accent); border-bottom-color: transparent;
-    transform: rotate(-45deg); margin: 0 2px 0 4px;
+    transform: rotate(-45deg); margin: 0 4px 6px 6px;
   }
 
-  /* ---- tab strip ---- */
   #tabstrip {
     display: flex;
-    align-items: center;
-    gap: 4px;
-    max-width: 42%;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
     overflow-x: auto;
     height: 30px;
     scrollbar-width: none;
@@ -77,88 +72,90 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    height: 26px;
-    padding: 0 8px;
-    border-radius: 6px;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 8px 8px 0 0;
     background: transparent;
     color: var(--text-dim);
     cursor: pointer;
     flex-shrink: 0;
-    max-width: 140px;
-    min-width: 60px;
-    border: 1px solid transparent;
+    max-width: 150px;
+    min-width: 64px;
   }
-  .tab:hover { background: var(--hover); }
+  .tab:hover:not(.active) { background: rgba(0,0,0,0.06); }
+  body.dark .tab:hover:not(.active) { background: rgba(255,255,255,0.08); }
   .tab.active {
     background: var(--bg);
     color: var(--text);
-    border-color: var(--border);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
   }
-  .tab.pinned {
-    min-width: 30px;
-    max-width: 30px;
-    padding: 0;
-    justify-content: center;
-  }
+  .tab.pinned { min-width: 32px; max-width: 32px; padding: 0; justify-content: center; }
   .tab .tab-monogram {
     width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     font-size: 10px; font-weight: 600; color: #fff;
   }
   .tab .tab-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    pointer-events: none;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1; pointer-events: none; font-size: 12px;
   }
   .tab .tab-close {
-    width: 14px;
-    height: 14px;
-    line-height: 14px;
-    text-align: center;
-    border-radius: 3px;
-    color: inherit;
-    opacity: 0.6;
-    flex-shrink: 0;
+    width: 16px; height: 16px; line-height: 16px; text-align: center;
+    border-radius: 3px; color: inherit; opacity: 0.55; flex-shrink: 0; font-size: 13px;
   }
-  .tab .tab-close:hover { opacity: 1; background: rgba(0,0,0,0.08); }
+  .tab .tab-close:hover { opacity: 1; background: rgba(0,0,0,0.1); }
+  body.dark .tab .tab-close:hover { background: rgba(255,255,255,0.14); }
 
   #newTabBtn {
-    width: 24px; height: 24px; flex-shrink: 0; border: none; border-radius: 5px;
-    background: transparent; color: var(--text-dim); cursor: pointer; font-size: 15px; line-height: 1;
+    width: 26px; height: 26px; flex-shrink: 0; border: none; border-radius: 50%;
+    background: transparent; color: var(--text-dim); cursor: pointer; font-size: 15px;
+    line-height: 1; margin-bottom: 3px;
   }
-  #newTabBtn:hover { background: var(--hover); }
+  #newTabBtn:hover { background: rgba(0,0,0,0.08); }
+  body.dark #newTabBtn:hover { background: rgba(255,255,255,0.1); }
 
-  .divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+  #winctrls { display: flex; align-items: center; gap: 0; flex-shrink: 0; align-self: flex-start; }
+  #winctrls button {
+    width: 32px; height: 30px; border: none; background: transparent; color: var(--text-dim);
+    cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;
+  }
+  #winctrls button:hover { background: rgba(0,0,0,0.08); }
+  body.dark #winctrls button:hover { background: rgba(255,255,255,0.1); }
+  #closeWinBtn:hover { background: #e81123 !important; color: #fff; }
 
-  #navbtns { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  /* =============== nav row (address bar) =============== */
+  #navRow {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    box-sizing: border-box;
+  }
+
+  #navbtns { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
   #navbtns button, #starBtn, #menuBtn {
-    width: 26px; height: 26px; border: none; border-radius: 5px; background: transparent;
-    color: var(--text-dim); cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+    width: 28px; height: 28px; border: none; border-radius: 50%; background: transparent;
+    color: var(--text-dim); cursor: pointer; font-size: 14px; display: flex;
+    align-items: center; justify-content: center; flex-shrink: 0;
   }
   #navbtns button:hover:not(:disabled), #starBtn:hover, #menuBtn:hover { background: var(--hover); }
   #navbtns button:disabled { opacity: 0.3; cursor: default; }
   #starBtn.active { color: var(--accent); }
 
+  #urlbarWrap {
+    flex: 1; min-width: 0; height: 30px; display: flex; align-items: center;
+    border: 1px solid var(--border); border-radius: 15px; background: var(--bg);
+    padding: 0 4px 0 12px; transition: border-color .1s ease, box-shadow .1s ease;
+  }
+  #urlbarWrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,115,232,0.15); }
   #urlbar {
-    flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 1px solid var(--border);
-    border-radius: 14px; background: var(--bg); color: var(--text); outline: none; font-size: 12px;
+    flex: 1; min-width: 0; height: 100%; border: none; background: transparent;
+    color: var(--text); outline: none; font-size: 12.5px;
   }
-  #urlbar:focus { border-color: var(--accent); }
 
-  /* ---- window controls ---- */
-  #winctrls { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
-  #winctrls button {
-    width: 32px; height: 32px; border: none; background: transparent; color: var(--text-dim);
-    cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center;
-  }
-  #winctrls button:hover { background: var(--hover); }
-  #closeWinBtn:hover { background: #e81123; color: #fff; }
-
-  /* ---- bookmarks bar ---- */
+  /* =============== bookmarks bar =============== */
   #bookmarksBar {
     height: 32px;
     display: none;
@@ -173,19 +170,20 @@
   #bookmarksBar.show { display: flex; }
   #bookmarksBar::-webkit-scrollbar { display: none; }
   .bm-chip {
+    -webkit-app-region: no-drag;
     display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px;
     font-size: 11px; color: var(--text); cursor: pointer; white-space: nowrap; flex-shrink: 0;
   }
   .bm-chip:hover { background: var(--hover); }
   .bm-empty { font-size: 11px; color: var(--text-dim); padding: 0 4px; }
 
-  /* ---- floating menus ---- */
+  /* =============== floating menus =============== */
   .floating-menu {
     position: fixed;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     min-width: 190px;
     z-index: 9999;
     display: none;
@@ -194,33 +192,37 @@
   .floating-menu.show { display: block; }
   .menu-item {
     padding: 9px 14px; font-size: 12px; color: var(--text); cursor: pointer;
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
   }
   .menu-item:hover { background: var(--hover); }
   .menu-item.danger { color: #d93025; }
+  .menu-item span { color: var(--text-dim); font-size: 11px; }
   .menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
 </style>
 </head>
 <body>
-  <div id="toolbar">
+  <div id="tabRow">
     <div id="logo" title="Daybreak"></div>
     <div id="tabstrip"></div>
     <button id="newTabBtn" title="New tab">+</button>
-    <div class="divider"></div>
-    <div id="navbtns">
-      <button id="backBtn" title="Back">&#8592;</button>
-      <button id="fwdBtn" title="Forward">&#8594;</button>
-      <button id="reloadBtn" title="Reload">&#8635;</button>
-    </div>
-    <input id="urlbar" type="text" spellcheck="false" placeholder="Search or enter address">
-    <button id="starBtn" title="Bookmark this page">&#9733;</button>
-    <button id="menuBtn" title="Menu">&#8942;</button>
-    <div class="divider"></div>
     <div id="winctrls">
       <button id="minBtn" title="Minimize">&#8212;</button>
       <button id="maxBtn" title="Maximize">&#9723;</button>
       <button id="closeWinBtn" title="Close">&#10005;</button>
     </div>
+  </div>
+
+  <div id="navRow">
+    <div id="navbtns">
+      <button id="backBtn" title="Back">&#8592;</button>
+      <button id="fwdBtn" title="Forward">&#8594;</button>
+      <button id="reloadBtn" title="Reload">&#8635;</button>
+    </div>
+    <div id="urlbarWrap">
+      <input id="urlbar" type="text" spellcheck="false" placeholder="Search or enter address">
+    </div>
+    <button id="starBtn" title="Bookmark this page">&#9733;</button>
+    <button id="menuBtn" title="Menu">&#8942;</button>
   </div>
 
   <div id="bookmarksBar"></div>
@@ -239,6 +241,7 @@
   </div>
 
   <div id="tabContextMenu" class="floating-menu">
+    <div class="menu-item" id="ctxReload">Reload</div>
     <div class="menu-item" id="ctxDuplicate">Duplicate tab</div>
     <div class="menu-item" id="ctxPin">Pin tab</div>
     <div class="menu-divider"></div>
@@ -303,7 +306,7 @@
       } else {
         var titleEl = document.createElement('span');
         titleEl.className = 'tab-title';
-        titleEl.textContent = tab.loading ? 'Loading…' : (tab.title || 'New Tab');
+        titleEl.textContent = tab.loading ? 'Loading\u2026' : (tab.title || 'New Tab');
         el.appendChild(titleEl);
 
         var closeEl = document.createElement('span');
@@ -344,7 +347,7 @@
     var show = !!(state.settings && state.settings.showBookmarksBar);
     bookmarksBar.classList.toggle('show', show);
     document.getElementById('menuBarCheck').textContent = show ? '\u2713' : '';
-    document.body.style.height = (42 + (show ? 32 : 0)) + 'px';
+    document.body.style.height = (36 + 40 + (show ? 32 : 0)) + 'px';
   }
 
   function refreshBookmarksBar() {
@@ -440,7 +443,7 @@
     menuDropdown.style.right = '8px';
     menuDropdown.style.left = '';
     menuDropdown.classList.add('show');
-    window.api.setOverlayExtra(320);
+    window.api.setOverlayExtra(340);
   }
 
   function openTabContextMenu(tab, x, y) {
@@ -451,7 +454,7 @@
     tabContextMenu.style.left = x + 'px';
     tabContextMenu.style.right = '';
     tabContextMenu.classList.add('show');
-    window.api.setOverlayExtra(220);
+    window.api.setOverlayExtra(260);
   }
 
   menuBtn.addEventListener('click', function (e) {
@@ -491,6 +494,9 @@
   });
 
   // ---- tab context menu items ----
+  document.getElementById('ctxReload').addEventListener('click', function () {
+    if (contextTabId) window.api.reload(contextTabId); closeAllMenus();
+  });
   document.getElementById('ctxDuplicate').addEventListener('click', function () {
     if (contextTabId) window.api.duplicateTab(contextTabId); closeAllMenus();
   });
