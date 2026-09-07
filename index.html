@@ -13,6 +13,7 @@
     --border: #dadce0;
     --accent: #1a73e8;
     --hover: #e8eaed;
+    --danger: #d93025;
   }
   body.dark {
     --bg: #232427;
@@ -22,11 +23,13 @@
     --border: #3c4043;
     --accent: #8ab4f8;
     --hover: #3c4043;
+    --danger: #f28b82;
   }
 
   html, body {
     margin: 0;
     padding: 0;
+    height: 100%;
     background: transparent;
     overflow: hidden;
     font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -36,6 +39,8 @@
     color: var(--text);
   }
 
+  #chrome { position: fixed; top: 0; left: 0; right: 0; }
+
   /* =============== tab row (top) =============== */
   #tabRow {
     height: 36px;
@@ -44,17 +49,17 @@
     gap: 2px;
     padding: 6px 6px 0;
     background: var(--tabbar);
-    -webkit-app-region: drag;
     box-sizing: border-box;
+    cursor: default;
   }
-
-  #tabRow button, #tabstrip, #winctrls { -webkit-app-region: no-drag; }
 
   #logo {
     width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%;
     border: 2px solid var(--accent); border-bottom-color: transparent;
     transform: rotate(-45deg); margin: 0 4px 6px 6px;
+    transition: transform .4s ease;
   }
+  #logo.spin { transform: rotate(315deg); }
 
   #tabstrip {
     display: flex;
@@ -81,26 +86,30 @@
     flex-shrink: 0;
     max-width: 150px;
     min-width: 64px;
+    transition: background-color .12s ease, color .12s ease;
+    animation: tabIn .15s ease;
   }
+  @keyframes tabIn { from { opacity: 0; transform: translateY(4px) scale(.96); } to { opacity: 1; transform: none; } }
   .tab:hover:not(.active) { background: rgba(0,0,0,0.06); }
   body.dark .tab:hover:not(.active) { background: rgba(255,255,255,0.08); }
-  .tab.active {
-    background: var(--bg);
-    color: var(--text);
-  }
+  .tab.active { background: var(--bg); color: var(--text); }
   .tab.pinned { min-width: 32px; max-width: 32px; padding: 0; justify-content: center; }
   .tab .tab-monogram {
     width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     font-size: 10px; font-weight: 600; color: #fff;
   }
-  .tab .tab-title {
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    flex: 1; pointer-events: none; font-size: 12px;
+  .tab .tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; pointer-events: none; font-size: 12px; }
+  .tab .tab-spinner {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    border: 1.5px solid var(--border); border-top-color: var(--accent);
+    animation: spin .6s linear infinite;
   }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .tab .tab-close {
     width: 16px; height: 16px; line-height: 16px; text-align: center;
     border-radius: 3px; color: inherit; opacity: 0.55; flex-shrink: 0; font-size: 13px;
+    transition: background-color .1s ease, opacity .1s ease;
   }
   .tab .tab-close:hover { opacity: 1; background: rgba(0,0,0,0.1); }
   body.dark .tab .tab-close:hover { background: rgba(255,255,255,0.14); }
@@ -108,15 +117,17 @@
   #newTabBtn {
     width: 26px; height: 26px; flex-shrink: 0; border: none; border-radius: 50%;
     background: transparent; color: var(--text-dim); cursor: pointer; font-size: 15px;
-    line-height: 1; margin-bottom: 3px;
+    line-height: 1; margin-bottom: 3px; transition: background-color .12s ease, transform .1s ease;
   }
   #newTabBtn:hover { background: rgba(0,0,0,0.08); }
   body.dark #newTabBtn:hover { background: rgba(255,255,255,0.1); }
+  #newTabBtn:active { transform: scale(0.88); }
 
   #winctrls { display: flex; align-items: center; gap: 0; flex-shrink: 0; align-self: flex-start; }
   #winctrls button {
     width: 32px; height: 30px; border: none; background: transparent; color: var(--text-dim);
     cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;
+    transition: background-color .12s ease;
   }
   #winctrls button:hover { background: rgba(0,0,0,0.08); }
   body.dark #winctrls button:hover { background: rgba(255,255,255,0.1); }
@@ -132,100 +143,128 @@
     background: var(--bg);
     border-bottom: 1px solid var(--border);
     box-sizing: border-box;
+    position: relative;
   }
+
+  #loadBar {
+    position: absolute; left: 0; bottom: -1px; height: 2px; width: 0;
+    background: var(--accent); opacity: 0; transition: opacity .15s ease;
+  }
+  #loadBar.active { opacity: 1; animation: loadSweep 1.1s ease-in-out infinite; }
+  @keyframes loadSweep { 0% { width: 0%; margin-left: 0%; } 50% { width: 60%; margin-left: 20%; } 100% { width: 0%; margin-left: 100%; } }
 
   #navbtns { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
   #navbtns button, #starBtn, #menuBtn {
     width: 28px; height: 28px; border: none; border-radius: 50%; background: transparent;
     color: var(--text-dim); cursor: pointer; font-size: 14px; display: flex;
     align-items: center; justify-content: center; flex-shrink: 0;
+    transition: background-color .12s ease, color .12s ease, transform .1s ease;
   }
   #navbtns button:hover:not(:disabled), #starBtn:hover, #menuBtn:hover { background: var(--hover); }
+  #navbtns button:active:not(:disabled), #starBtn:active, #menuBtn:active { transform: scale(0.88); }
   #navbtns button:disabled { opacity: 0.3; cursor: default; }
-  #starBtn.active { color: var(--accent); }
+  #starBtn.active { color: var(--accent); animation: starPop .25s ease; }
+  @keyframes starPop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
 
   #urlbarWrap {
     flex: 1; min-width: 0; height: 30px; display: flex; align-items: center;
     border: 1px solid var(--border); border-radius: 15px; background: var(--bg);
-    padding: 0 4px 0 12px; transition: border-color .1s ease, box-shadow .1s ease;
+    padding: 0 4px 0 12px; transition: border-color .12s ease, box-shadow .12s ease;
   }
   #urlbarWrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,115,232,0.15); }
-  #urlbar {
-    flex: 1; min-width: 0; height: 100%; border: none; background: transparent;
-    color: var(--text); outline: none; font-size: 12.5px;
-  }
+  #urlbar { flex: 1; min-width: 0; height: 100%; border: none; background: transparent; color: var(--text); outline: none; font-size: 12.5px; }
+  .lock { color: var(--text-dim); font-size: 11px; margin-right: 4px; flex-shrink: 0; }
 
   /* =============== bookmarks bar =============== */
   #bookmarksBar {
-    height: 32px;
-    display: none;
-    align-items: center;
-    gap: 4px;
-    padding: 0 10px;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    -webkit-app-region: drag;
+    height: 32px; display: none; align-items: center; gap: 4px; padding: 0 10px;
+    background: var(--bg); border-bottom: 1px solid var(--border); overflow-x: auto;
   }
   #bookmarksBar.show { display: flex; }
   #bookmarksBar::-webkit-scrollbar { display: none; }
   .bm-chip {
-    -webkit-app-region: no-drag;
     display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px;
     font-size: 11px; color: var(--text); cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: background-color .1s ease;
   }
   .bm-chip:hover { background: var(--hover); }
   .bm-empty { font-size: 11px; color: var(--text-dim); padding: 0 4px; }
 
+  /* =============== find bar =============== */
+  #findBar {
+    position: fixed; top: 44px; right: 16px; z-index: 9998;
+    display: none; align-items: center; gap: 4px; padding: 6px 8px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    opacity: 0; transform: translateY(-6px) scale(.98);
+    transition: opacity .12s ease, transform .12s ease;
+  }
+  #findBar.show { display: flex; opacity: 1; transform: none; }
+  #findBar input { border: none; outline: none; background: transparent; color: var(--text); font-size: 12px; width: 160px; }
+  #findBar .find-count { font-size: 11px; color: var(--text-dim); min-width: 46px; text-align: center; flex-shrink: 0; }
+  #findBar button {
+    width: 24px; height: 24px; border: none; border-radius: 50%; background: transparent;
+    color: var(--text-dim); cursor: pointer; font-size: 12px; flex-shrink: 0;
+    transition: background-color .1s ease;
+  }
+  #findBar button:hover { background: var(--hover); }
+
   /* =============== floating menus =============== */
   .floating-menu {
-    position: fixed;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-    min-width: 190px;
-    z-index: 9999;
-    display: none;
-    padding: 6px 0;
+    position: fixed; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2); min-width: 190px; z-index: 9999;
+    padding: 6px 0; opacity: 0; transform: translateY(-6px) scale(.98); pointer-events: none;
+    transition: opacity .12s ease, transform .12s ease;
   }
-  .floating-menu.show { display: block; }
+  .floating-menu.show { opacity: 1; transform: none; pointer-events: auto; }
   .menu-item {
     padding: 9px 14px; font-size: 12px; color: var(--text); cursor: pointer;
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    transition: background-color .1s ease;
   }
   .menu-item:hover { background: var(--hover); }
-  .menu-item.danger { color: #d93025; }
+  .menu-item.danger { color: var(--danger); }
   .menu-item span { color: var(--text-dim); font-size: 11px; }
   .menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
 </style>
 </head>
 <body>
-  <div id="tabRow">
-    <div id="logo" title="Daybreak"></div>
-    <div id="tabstrip"></div>
-    <button id="newTabBtn" title="New tab">+</button>
-    <div id="winctrls">
-      <button id="minBtn" title="Minimize">&#8212;</button>
-      <button id="maxBtn" title="Maximize">&#9723;</button>
-      <button id="closeWinBtn" title="Close">&#10005;</button>
+  <div id="chrome">
+    <div id="tabRow">
+      <div id="logo" title="Daybreak"></div>
+      <div id="tabstrip"></div>
+      <button id="newTabBtn" title="New tab">+</button>
+      <div id="winctrls">
+        <button id="minBtn" title="Minimize">&#8212;</button>
+        <button id="maxBtn" title="Maximize">&#9723;</button>
+        <button id="closeWinBtn" title="Close">&#10005;</button>
+      </div>
     </div>
+
+    <div id="navRow">
+      <div id="loadBar"></div>
+      <div id="navbtns">
+        <button id="backBtn" title="Back">&#8592;</button>
+        <button id="fwdBtn" title="Forward">&#8594;</button>
+        <button id="reloadBtn" title="Reload">&#8635;</button>
+      </div>
+      <div id="urlbarWrap">
+        <input id="urlbar" type="text" spellcheck="false" placeholder="Search or enter address">
+      </div>
+      <button id="starBtn" title="Bookmark this page (Ctrl+D)">&#9733;</button>
+      <button id="menuBtn" title="Menu">&#8942;</button>
+    </div>
+
+    <div id="bookmarksBar"></div>
   </div>
 
-  <div id="navRow">
-    <div id="navbtns">
-      <button id="backBtn" title="Back">&#8592;</button>
-      <button id="fwdBtn" title="Forward">&#8594;</button>
-      <button id="reloadBtn" title="Reload">&#8635;</button>
-    </div>
-    <div id="urlbarWrap">
-      <input id="urlbar" type="text" spellcheck="false" placeholder="Search or enter address">
-    </div>
-    <button id="starBtn" title="Bookmark this page">&#9733;</button>
-    <button id="menuBtn" title="Menu">&#8942;</button>
+  <div id="findBar">
+    <input id="findInput" type="text" placeholder="Find in page">
+    <span class="find-count" id="findCount"></span>
+    <button id="findPrev" title="Previous">&#8593;</button>
+    <button id="findNext" title="Next">&#8595;</button>
+    <button id="findClose" title="Close">&#10005;</button>
   </div>
-
-  <div id="bookmarksBar"></div>
 
   <div id="menuDropdown" class="floating-menu">
     <div class="menu-item" id="menuNewTab">New tab<span>Ctrl+T</span></div>
@@ -233,8 +272,13 @@
     <div class="menu-item" id="menuBookmarks">Bookmarks</div>
     <div class="menu-item" id="menuHistory">History</div>
     <div class="menu-item" id="menuDownloads">Downloads</div>
-    <div class="menu-item" id="menuSettings">Settings</div>
+    <div class="menu-item" id="menuFind">Find in page<span>Ctrl+F</span></div>
     <div class="menu-divider"></div>
+    <div class="menu-item" id="menuZoomOut">Zoom out<span>Ctrl+-</span></div>
+    <div class="menu-item" id="menuZoomReset">Reset zoom<span>Ctrl+0</span></div>
+    <div class="menu-item" id="menuZoomIn">Zoom in<span>Ctrl++</span></div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" id="menuSettings">Settings</div>
     <div class="menu-item" id="menuToggleBar">Show bookmarks bar<span id="menuBarCheck"></span></div>
     <div class="menu-divider"></div>
     <div class="menu-item" id="menuAbout">About Daybreak</div>
@@ -269,6 +313,12 @@
   var minBtn = document.getElementById('minBtn');
   var maxBtn = document.getElementById('maxBtn');
   var closeWinBtn = document.getElementById('closeWinBtn');
+  var tabRow = document.getElementById('tabRow');
+  var loadBar = document.getElementById('loadBar');
+  var logo = document.getElementById('logo');
+  var findBar = document.getElementById('findBar');
+  var findInput = document.getElementById('findInput');
+  var findCount = document.getElementById('findCount');
 
   function activeTab() {
     return state.tabs.find(function (t) { return t.id === state.activeId; }) || null;
@@ -289,42 +339,85 @@
     return pinned.concat(rest);
   }
 
-  function renderTabs() {
-    tabstrip.innerHTML = '';
-    orderedTabs().forEach(function (tab) {
-      var el = document.createElement('div');
-      el.className = 'tab' + (tab.id === state.activeId ? ' active' : '') + (tab.pinned ? ' pinned' : '');
-      el.title = tab.url;
+  // Reused across renders so tabs are updated in place rather than torn down
+  // and recreated — recreating them retriggered every tab's entrance
+  // animation on every single state push (loading start/stop, title
+  // updates, etc. all push state, which happens many times during one page
+  // load), which is what looked like constant flashing.
+  var tabElById = {};
+  var tabSigById = {}; // last-rendered signature per tab, to skip no-op rebuilds
 
-      if (tab.pinned) {
-        var host = hostOf(tab.url);
-        var mono = document.createElement('span');
-        mono.className = 'tab-monogram';
-        mono.style.background = 'hsl(' + hueFor(host) + ',55%,45%)';
-        mono.textContent = (host[0] || '?').toUpperCase();
-        el.appendChild(mono);
-      } else {
-        var titleEl = document.createElement('span');
-        titleEl.className = 'tab-title';
-        titleEl.textContent = tab.loading ? 'Loading\u2026' : (tab.title || 'New Tab');
-        el.appendChild(titleEl);
+  function ensureTabElement(tab) {
+    var el = tabElById[tab.id];
+    if (el) return el;
+    el = document.createElement('div');
+    el.addEventListener('click', function () { window.api.switchTab(tab.id); });
+    el.addEventListener('mousedown', function (e) {
+      if (e.button === 1) { e.preventDefault(); window.api.closeTab(tab.id); } // middle-click closes
+    });
+    el.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+      // Look up the current tab fresh (not the possibly-stale snapshot this
+      // closure was created with) so Pin/Unpin always reflects reality.
+      var current = state.tabs.find(function (t) { return t.id === tab.id; }) || tab;
+      openTabContextMenu(current, e.clientX, e.clientY);
+    });
+    tabElById[tab.id] = el;
+    return el;
+  }
 
-        var closeEl = document.createElement('span');
-        closeEl.className = 'tab-close';
-        closeEl.textContent = '\u00d7';
-        closeEl.addEventListener('click', function (e) {
-          e.stopPropagation();
-          window.api.closeTab(tab.id);
-        });
-        el.appendChild(closeEl);
+  function updateTabElement(el, tab) {
+    el.className = 'tab' + (tab.id === state.activeId ? ' active' : '') + (tab.pinned ? ' pinned' : '');
+    el.title = tab.url;
+    el.innerHTML = ''; // cheap: only replaces this tab's own small content, not the whole strip
+
+    if (tab.pinned) {
+      var host = hostOf(tab.url);
+      var mono = document.createElement('span');
+      mono.className = 'tab-monogram';
+      mono.style.background = 'hsl(' + hueFor(host) + ',55%,45%)';
+      mono.textContent = (host[0] || '?').toUpperCase();
+      el.appendChild(mono);
+    } else {
+      if (tab.loading) {
+        var spinner = document.createElement('span');
+        spinner.className = 'tab-spinner';
+        el.appendChild(spinner);
       }
+      var titleEl = document.createElement('span');
+      titleEl.className = 'tab-title';
+      titleEl.textContent = tab.loading ? 'Loading\u2026' : (tab.title || 'New Tab');
+      el.appendChild(titleEl);
 
-      el.addEventListener('click', function () { window.api.switchTab(tab.id); });
-      el.addEventListener('contextmenu', function (e) {
-        e.preventDefault();
-        openTabContextMenu(tab, e.clientX, e.clientY);
+      var closeEl = document.createElement('span');
+      closeEl.className = 'tab-close';
+      closeEl.textContent = '\u00d7';
+      closeEl.addEventListener('click', function (e) {
+        e.stopPropagation();
+        window.api.closeTab(tab.id);
       });
-      tabstrip.appendChild(el);
+      el.appendChild(closeEl);
+    }
+  }
+
+  function renderTabs() {
+    var ordered = orderedTabs();
+    var seen = {};
+    ordered.forEach(function (tab) {
+      seen[tab.id] = true;
+      var el = ensureTabElement(tab);
+      // Busy pages fire many state pushes in quick succession; a tab whose
+      // own visible fields haven't actually changed shouldn't have its
+      // content wiped and rebuilt just because SOME tab's state changed.
+      var sig = [tab.id === state.activeId, tab.pinned, tab.loading, tab.title, tab.url].join('\u0001');
+      if (tabSigById[tab.id] !== sig) {
+        tabSigById[tab.id] = sig;
+        updateTabElement(el, tab);
+      }
+      tabstrip.appendChild(el); // re-appending an already-attached node just reorders it, no re-animation
+    });
+    Object.keys(tabElById).forEach(function (id) {
+      if (!seen[id]) { tabElById[id].remove(); delete tabElById[id]; delete tabSigById[id]; }
     });
   }
 
@@ -335,11 +428,15 @@
       backBtn.disabled = !active.canGoBack;
       fwdBtn.disabled = !active.canGoForward;
       starBtn.classList.toggle('active', !!active.bookmarked);
+      loadBar.classList.toggle('active', !!active.loading);
+      logo.classList.toggle('spin', !!active.loading);
     } else {
       if (!editingUrl) urlbar.value = '';
       backBtn.disabled = true;
       fwdBtn.disabled = true;
       starBtn.classList.remove('active');
+      loadBar.classList.remove('active');
+      logo.classList.remove('spin');
     }
   }
 
@@ -347,29 +444,32 @@
     var show = !!(state.settings && state.settings.showBookmarksBar);
     bookmarksBar.classList.toggle('show', show);
     document.getElementById('menuBarCheck').textContent = show ? '\u2713' : '';
-    document.body.style.height = (36 + 40 + (show ? 32 : 0)) + 'px';
   }
 
+  var lastBookmarksSignature = null;
   function refreshBookmarksBar() {
-    window.api.getBookmarks().then(function (list) {
-      bookmarksBar.innerHTML = '';
-      if (!list.length) {
-        var empty = document.createElement('span');
-        empty.className = 'bm-empty';
-        empty.textContent = 'Bookmarks you save will appear here';
-        bookmarksBar.appendChild(empty);
-        return;
-      }
-      list.forEach(function (b) {
-        var chip = document.createElement('div');
-        chip.className = 'bm-chip';
-        chip.textContent = b.title || b.url;
-        chip.title = b.url;
-        chip.addEventListener('click', function () {
-          if (state.activeId) window.api.navigate(state.activeId, b.url);
-        });
-        bookmarksBar.appendChild(chip);
+    var list = state.bookmarks || [];
+    var signature = list.map(function (b) { return b.id; }).join(',');
+    if (signature === lastBookmarksSignature) return; // nothing actually changed — don't touch the DOM
+    lastBookmarksSignature = signature;
+
+    bookmarksBar.innerHTML = '';
+    if (!list.length) {
+      var empty = document.createElement('span');
+      empty.className = 'bm-empty';
+      empty.textContent = 'Bookmarks you save will appear here';
+      bookmarksBar.appendChild(empty);
+      return;
+    }
+    list.forEach(function (b) {
+      var chip = document.createElement('div');
+      chip.className = 'bm-chip';
+      chip.textContent = b.title || b.url;
+      chip.title = b.url;
+      chip.addEventListener('click', function () {
+        if (state.activeId) window.api.navigate(state.activeId, b.url);
       });
+      bookmarksBar.appendChild(chip);
     });
   }
 
@@ -385,20 +485,13 @@
     refreshBookmarksBar();
   }
 
-  window.api.onUpdate(function (newState) {
-    state = newState;
-    render();
-  });
-
+  window.api.onUpdate(function (newState) { state = newState; render(); });
   window.api.onWinState(function (winState) {
     maxBtn.innerHTML = winState.maximized ? '&#10064;' : '&#9723;';
     maxBtn.title = winState.maximized ? 'Restore' : 'Maximize';
   });
-
-  window.api.onFocusUrlbar(function () {
-    urlbar.focus();
-    urlbar.select();
-  });
+  window.api.onFocusUrlbar(function () { urlbar.focus(); urlbar.select(); });
+  window.api.onBookmarkToggleRequest(function () { starBtn.click(); });
 
   // ---- tab actions ----
   newTabBtn.addEventListener('click', function () { window.api.createTab(); });
@@ -429,11 +522,29 @@
   maxBtn.addEventListener('click', function () { window.api.maximizeWindow(); });
   closeWinBtn.addEventListener('click', function () { window.api.closeWindow(); });
 
-  // ---- floating menu helpers (main dropdown + tab context menu share one slot) ----
+  // ---- floating menu helpers ----
+  // The overlay only covers the toolbar strip (see main.js), so opening any
+  // floating UI below that edge needs to temporarily grow the overlay's
+  // bounds first, or it gets clipped.
+  function shrinkOverlayIfIdle() {
+    if (!anyMenuOpen() && !findBar.classList.contains('show')) window.api.setOverlayExtra(0);
+  }
   function closeAllMenus() {
     menuDropdown.classList.remove('show');
     tabContextMenu.classList.remove('show');
-    window.api.setOverlayExtra(0);
+    shrinkOverlayIfIdle();
+  }
+  function anyMenuOpen() {
+    return menuDropdown.classList.contains('show') || tabContextMenu.classList.contains('show');
+  }
+
+  // Reserve exactly as much extra overlay height as the floating element
+  // actually needs (measured, not guessed) — a hardcoded number silently
+  // drifts out of date the next time items are added to the menu, which is
+  // exactly what clipped/blocked it before.
+  function growToFit(el) {
+    var rect = el.getBoundingClientRect();
+    window.api.setOverlayExtra(Math.ceil(rect.bottom) + 12);
   }
 
   function openMenu() {
@@ -443,7 +554,7 @@
     menuDropdown.style.right = '8px';
     menuDropdown.style.left = '';
     menuDropdown.classList.add('show');
-    window.api.setOverlayExtra(340);
+    growToFit(menuDropdown);
   }
 
   function openTabContextMenu(tab, x, y) {
@@ -454,7 +565,7 @@
     tabContextMenu.style.left = x + 'px';
     tabContextMenu.style.right = '';
     tabContextMenu.classList.add('show');
-    window.api.setOverlayExtra(260);
+    growToFit(tabContextMenu);
   }
 
   menuBtn.addEventListener('click', function (e) {
@@ -465,28 +576,20 @@
     if (!e.target.closest('.floating-menu') && !e.target.closest('#menuBtn')) closeAllMenus();
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeAllMenus();
+    if (e.key === 'Escape') { closeAllMenus(); closeFindBar(); }
   });
 
-  // ---- main menu items ----
-  document.getElementById('menuNewTab').addEventListener('click', function () {
-    window.api.createTab(); closeAllMenus();
-  });
-  document.getElementById('menuBookmarks').addEventListener('click', function () {
-    if (state.activeId) window.api.navigate(state.activeId, 'daybreak://bookmarks'); closeAllMenus();
-  });
-  document.getElementById('menuHistory').addEventListener('click', function () {
-    if (state.activeId) window.api.navigate(state.activeId, 'daybreak://history'); closeAllMenus();
-  });
-  document.getElementById('menuDownloads').addEventListener('click', function () {
-    if (state.activeId) window.api.navigate(state.activeId, 'daybreak://downloads'); closeAllMenus();
-  });
-  document.getElementById('menuSettings').addEventListener('click', function () {
-    if (state.activeId) window.api.navigate(state.activeId, 'daybreak://settings'); closeAllMenus();
-  });
-  document.getElementById('menuAbout').addEventListener('click', function () {
-    if (state.activeId) window.api.navigate(state.activeId, 'daybreak://about'); closeAllMenus();
-  });
+  // ---- main menu items (internal pages open as NEW TABS, never replace the current page) ----
+  document.getElementById('menuNewTab').addEventListener('click', function () { window.api.createTab(); closeAllMenus(); });
+  document.getElementById('menuBookmarks').addEventListener('click', function () { window.api.createTab('daybreak://bookmarks'); closeAllMenus(); });
+  document.getElementById('menuHistory').addEventListener('click', function () { window.api.createTab('daybreak://history'); closeAllMenus(); });
+  document.getElementById('menuDownloads').addEventListener('click', function () { window.api.createTab('daybreak://downloads'); closeAllMenus(); });
+  document.getElementById('menuSettings').addEventListener('click', function () { window.api.createTab('daybreak://settings'); closeAllMenus(); });
+  document.getElementById('menuAbout').addEventListener('click', function () { window.api.createTab('daybreak://about'); closeAllMenus(); });
+  document.getElementById('menuFind').addEventListener('click', function () { openFindBar(); closeAllMenus(); });
+  document.getElementById('menuZoomIn').addEventListener('click', function () { if (state.activeId) window.api.zoomIn(state.activeId); closeAllMenus(); });
+  document.getElementById('menuZoomOut').addEventListener('click', function () { if (state.activeId) window.api.zoomOut(state.activeId); closeAllMenus(); });
+  document.getElementById('menuZoomReset').addEventListener('click', function () { if (state.activeId) window.api.zoomReset(state.activeId); closeAllMenus(); });
   document.getElementById('menuToggleBar').addEventListener('click', function () {
     var current = !!(state.settings && state.settings.showBookmarksBar);
     window.api.setSettings({ showBookmarksBar: !current });
@@ -494,20 +597,68 @@
   });
 
   // ---- tab context menu items ----
-  document.getElementById('ctxReload').addEventListener('click', function () {
-    if (contextTabId) window.api.reload(contextTabId); closeAllMenus();
+  document.getElementById('ctxReload').addEventListener('click', function () { if (contextTabId) window.api.reload(contextTabId); closeAllMenus(); });
+  document.getElementById('ctxDuplicate').addEventListener('click', function () { if (contextTabId) window.api.duplicateTab(contextTabId); closeAllMenus(); });
+  document.getElementById('ctxPin').addEventListener('click', function () { if (contextTabId) window.api.togglePinTab(contextTabId); closeAllMenus(); });
+  document.getElementById('ctxCloseOthers').addEventListener('click', function () { if (contextTabId) window.api.closeOtherTabs(contextTabId); closeAllMenus(); });
+  document.getElementById('ctxClose').addEventListener('click', function () { if (contextTabId) window.api.closeTab(contextTabId); closeAllMenus(); });
+
+  // ---- find in page ----
+  function openFindBar() {
+    findBar.classList.add('show');
+    findInput.focus();
+    findInput.select();
+    growToFit(findBar);
+  }
+  function closeFindBar() {
+    if (!findBar.classList.contains('show')) return;
+    findBar.classList.remove('show');
+    findCount.textContent = '';
+    if (state.activeId) window.api.findStop(state.activeId);
+    shrinkOverlayIfIdle();
+  }
+  window.api.onFindOpen(openFindBar);
+  window.api.onFindResult(function (r) {
+    if (!r || !r.tabId || r.tabId !== state.activeId) return;
+    findCount.textContent = r.matches ? (r.activeMatch + ' of ' + r.matches) : 'No results';
   });
-  document.getElementById('ctxDuplicate').addEventListener('click', function () {
-    if (contextTabId) window.api.duplicateTab(contextTabId); closeAllMenus();
+  findInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && state.activeId) window.api.findStart(state.activeId, findInput.value, !e.shiftKey);
+    else if (e.key === 'Escape') closeFindBar();
   });
-  document.getElementById('ctxPin').addEventListener('click', function () {
-    if (contextTabId) window.api.togglePinTab(contextTabId); closeAllMenus();
+  document.getElementById('findPrev').addEventListener('click', function () { if (state.activeId) window.api.findNext(state.activeId, findInput.value, false); });
+  document.getElementById('findNext').addEventListener('click', function () { if (state.activeId) window.api.findStart(state.activeId, findInput.value, true); });
+  document.getElementById('findClose').addEventListener('click', closeFindBar);
+
+  // ---- manual window drag (tab row) ----
+  // This only needs mousedown/mousemove within the toolbar's own bounds, so
+  // — unlike resize — it works fine without the overlay covering the full
+  // window.
+  var dragStartMouse = null, dragStartWin = null;
+  tabRow.addEventListener('mousedown', function (e) {
+    if (e.button !== 0) return;
+    if (e.target.closest('.tab, button')) return;
+    dragStartMouse = { x: e.screenX, y: e.screenY };
+    window.api.windowDragStart();
+    window.api.getWindowPosition().then(function (pos) { dragStartWin = pos; });
   });
-  document.getElementById('ctxCloseOthers').addEventListener('click', function () {
-    if (contextTabId) window.api.closeOtherTabs(contextTabId); closeAllMenus();
+  tabRow.addEventListener('dblclick', function (e) {
+    if (e.target.closest('.tab, button')) return;
+    window.api.maximizeWindow();
   });
-  document.getElementById('ctxClose').addEventListener('click', function () {
-    if (contextTabId) window.api.closeTab(contextTabId); closeAllMenus();
+
+  var pendingFrame = null;
+  document.addEventListener('mousemove', function (e) {
+    if (!dragStartMouse || !dragStartWin) return;
+    var dx = e.screenX - dragStartMouse.x, dy = e.screenY - dragStartMouse.y;
+    if (pendingFrame) cancelAnimationFrame(pendingFrame);
+    pendingFrame = requestAnimationFrame(function () {
+      window.api.setWindowPosition(dragStartWin[0] + dx, dragStartWin[1] + dy);
+    });
+  });
+  document.addEventListener('mouseup', function () {
+    if (dragStartMouse) window.api.windowDragEnd();
+    dragStartMouse = null; dragStartWin = null;
   });
 })();
 </script>

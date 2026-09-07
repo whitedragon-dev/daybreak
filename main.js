@@ -7,7 +7,8 @@ const pages = require('./pages.js');
 const TAB_ROW_HEIGHT = 36;
 const NAV_ROW_HEIGHT = 40;
 const BOOKMARKS_BAR_HEIGHT = 32;
-let overlayExtra = 0; // extra height temporarily reserved for floating UI (menu / tab context menu)
+const MIN_WIDTH = 480;
+const MIN_HEIGHT = 360;
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'daybreak', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }
@@ -15,6 +16,15 @@ protocol.registerSchemesAsPrivileged([
 
 let win = null;
 let overlayView = null;
+let windowDragging = false;
+let dragFixedSize = null; // {width, height} captured at drag start, re-asserted on every move
+
+function winAlive() {
+  return !!(win && !win.isDestroyed());
+}
+function overlayAlive() {
+  return !!(overlayView && !overlayView.webContents.isDestroyed());
+}
 
 /** @type {Map<string, { view: import('electron').WebContentsView, title: string, url: string, loading: boolean, pinned: boolean, lastHistoryId: string|null }>} */
 const tabs = new Map();
@@ -42,44 +52,57 @@ function saveJSON(name, data) {
   }
 }
 
+const saveTimers = {};
+function saveJSONDebounced(name, getData) {
+  if (saveTimers[name]) clearTimeout(saveTimers[name]);
+  saveTimers[name] = setTimeout(() => {
+    delete saveTimers[name];
+    saveJSON(name, getData());
+  }, 300);
+}
+
 let bookmarks = loadJSON('bookmarks.json', []);
 let history = loadJSON('history.json', []);
 let downloads = loadJSON('downloads.json', []);
 let settings = Object.assign(
-  { theme: 'light', homepage: 'daybreak://newtab', searchEngine: 'google', showBookmarksBar: true },
+  { theme: 'light', homepage: 'daybreak://newtab', searchEngine: 'google', showBookmarksBar: true, adBlockEnabled: true },
   loadJSON('settings.json', {})
 );
 
+// Bookmarks/settings changes are rare and user-initiated, so those save
+// immediately. History and downloads can update many times in a burst (a
+// busy page firing several navigations within milliseconds, or a
+// downloads's progress ticking) — those are debounced so we don't do a
+// synchronous disk write on every single event.
 function saveBookmarks() { saveJSON('bookmarks.json', bookmarks); }
-function saveHistory() { saveJSON('history.json', history); }
-function saveDownloads() { saveJSON('downloads.json', downloads); }
+function saveHistory() { saveJSONDebounced('history.json', () => history); }
+function saveDownloads() { saveJSONDebounced('downloads.json', () => downloads); }
 function saveSettings() { saveJSON('settings.json', settings); }
 
 // ---------------- layout ----------------
+
+// Extra height temporarily reserved so the overlay can paint a floating
+// menu/find-bar without it being clipped at the toolbar's normal bottom
+// edge. WebContentsView has no setIgnoreMouseEvents/click-through support,
+// so the overlay can only ever safely cover the toolbar strip — not the
+// full window — which means this is the mechanism for floating UI instead
+// of making the overlay full-window.
+let overlayExtra = 0;
 
 function chromeHeight() {
   return TAB_ROW_HEIGHT + NAV_ROW_HEIGHT + (settings.showBookmarksBar ? BOOKMARKS_BAR_HEIGHT : 0);
 }
 
-function overlayBoundsHeight() {
-  return chromeHeight() + overlayExtra;
-}
-
-function getContentSize() {
-  const [width, height] = win.getContentSize();
-  return { width, height };
-}
-
 function layout() {
-  if (!win) return;
-  const { width, height } = getContentSize();
+  if (!winAlive() || !overlayAlive()) return;
+  const [width, height] = win.getContentSize();
   const tabTop = chromeHeight();
 
-  // The overlay may be temporarily taller than the toolbar (e.g. while a
-  // menu is open) so it can paint over the top of the tab area — but the
-  // tab view itself always starts at the fixed toolbar height, so opening a
-  // menu never resizes or reflows the page underneath.
-  overlayView.setBounds({ x: 0, y: 0, width, height: overlayBoundsHeight() });
+  // The overlay covers the toolbar (+ any temporarily reserved extra for an
+  // open menu/find-bar) and stays on top in z-order; the tab view always
+  // starts at the fixed toolbar height regardless of overlayExtra, so
+  // opening a menu never resizes or reflows the page underneath.
+  overlayView.setBounds({ x: 0, y: 0, width, height: Math.min(height, tabTop + overlayExtra) });
 
   for (const [id, tab] of tabs) {
     if (id === activeId) {
@@ -96,6 +119,7 @@ function serializeState() {
   return {
     activeId,
     settings,
+    bookmarks,
     tabs: [...tabs.entries()].map(([id, tab]) => {
       const wc = tab.view.webContents;
       return {
@@ -112,13 +136,19 @@ function serializeState() {
   };
 }
 
+let pushStateTimer = null;
 function pushState() {
-  if (!overlayView || overlayView.webContents.isDestroyed()) return;
-  overlayView.webContents.send('tabs:update', serializeState());
+  if (!overlayAlive()) return;
+  if (pushStateTimer) return; // an update is already scheduled — this burst will be covered by it
+  pushStateTimer = setTimeout(() => {
+    pushStateTimer = null;
+    if (!overlayAlive()) return;
+    overlayView.webContents.send('tabs:update', serializeState());
+  }, 16);
 }
 
 function pushWinState() {
-  if (!overlayView || overlayView.webContents.isDestroyed() || !win) return;
+  if (!overlayAlive() || !winAlive()) return;
   overlayView.webContents.send('win:state', { maximized: win.isMaximized() });
 }
 
@@ -221,9 +251,47 @@ function buildPageContextMenu(wc, params) {
   return Menu.buildFromTemplate(template);
 }
 
+// ---------------- ad blocker ----------------
+
+// A compact, curated list of common ad/tracker hostnames. Matched by exact
+// host or subdomain suffix, not a substring — so 'ads.example.com' matches
+// the 'example.com' rule only if 'example.com' is actually in this list
+// (it isn't here), avoiding accidental over-blocking of unrelated sites.
+const AD_BLOCK_HOSTS = [
+  'doubleclick.net', 'googlesyndication.com', 'googleadservices.com',
+  'google-analytics.com', 'googletagmanager.com', 'googletagservices.com',
+  'adservice.google.com', 'adnxs.com', 'advertising.com', 'adsrvr.org',
+  'taboola.com', 'outbrain.com', 'criteo.com', 'criteo.net', 'pubmatic.com',
+  'rubiconproject.com', 'openx.net', 'moatads.com', 'scorecardresearch.com',
+  'quantserve.com', 'amazon-adsystem.com', 'facebook.net', 'connect.facebook.net',
+  'analytics.twitter.com', 'ads.linkedin.com', 'bat.bing.com', 'hotjar.com',
+  'mixpanel.com', 'segment.com', 'segment.io', 'branch.io', 'appsflyer.com',
+  'adform.net', 'adroll.com', 'yieldmo.com', 'sharethrough.com', 'media.net',
+  'smartadserver.com', 'casalemedia.com', 'contextweb.com', 'bidswitch.net'
+];
+
+let adBlockHandlerAttached = false;
+
+function hostMatchesBlockList(hostname) {
+  if (!hostname) return false;
+  return AD_BLOCK_HOSTS.some((h) => hostname === h || hostname.endsWith('.' + h));
+}
+
+function setupAdBlocker() {
+  if (adBlockHandlerAttached) return;
+  adBlockHandlerAttached = true;
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+    if (!settings.adBlockEnabled) { callback({ cancel: false }); return; }
+    let hostname = '';
+    try { hostname = new URL(details.url).hostname; } catch (e) { /* ignore */ }
+    callback({ cancel: hostMatchesBlockList(hostname) });
+  });
+}
+
 // ---------------- tabs ----------------
 
 function createTab(url, opts) {
+  if (!winAlive()) return null;
   const id = randomUUID();
   const view = new WebContentsView({
     webPreferences: {
@@ -280,6 +348,9 @@ function createTab(url, opts) {
 
   wc.on('before-input-event', (_e, input) => handleShortcut(input, id));
   wc.on('context-menu', (_e, params) => { buildPageContextMenu(wc, params).popup({ window: win }); });
+  wc.on('found-in-page', (_e, result) => {
+    if (overlayAlive()) overlayView.webContents.send('find:result', { tabId: id, matches: result.matches, activeMatch: result.activeMatchOrdinal });
+  });
 
   wc.loadURL(normalizeUrl(initialUrl));
 
@@ -298,14 +369,14 @@ function closeTab(id) {
   const tab = tabs.get(id);
   if (!tab) return;
 
-  win.contentView.removeChildView(tab.view);
+  if (winAlive()) win.contentView.removeChildView(tab.view);
   if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
   tabs.delete(id);
 
   if (activeId === id) {
     const remaining = [...tabs.keys()];
     if (remaining.length > 0) setActiveTab(remaining[remaining.length - 1]);
-    else createTab(settings.homepage);
+    else if (winAlive()) createTab(settings.homepage);
   } else {
     layout();
     pushState();
@@ -338,7 +409,12 @@ function handleShortcut(input, sourceTabId) {
   if (ctrl && input.key.toLowerCase() === 't') { createTab(settings.homepage); }
   else if (ctrl && input.key.toLowerCase() === 'w') { closeTab(sourceTabId || activeId); }
   else if (ctrl && input.key.toLowerCase() === 'r') { const t = tabs.get(activeId); if (t) t.view.webContents.reload(); }
-  else if (ctrl && input.key.toLowerCase() === 'l') { overlayView.webContents.send('focus-urlbar'); }
+  else if (ctrl && input.key.toLowerCase() === 'l') { if (overlayAlive()) overlayView.webContents.send('focus-urlbar'); }
+  else if (ctrl && input.key.toLowerCase() === 'f') { if (overlayAlive()) overlayView.webContents.send('find:open'); }
+  else if (ctrl && input.key.toLowerCase() === 'd') { const t = tabs.get(activeId); if (t && overlayAlive()) overlayView.webContents.send('bookmark:toggle-request'); }
+  else if (ctrl && (input.key === '=' || input.key === '+')) { const t = tabs.get(activeId); if (t) t.view.webContents.setZoomLevel(t.view.webContents.getZoomLevel() + 0.5); }
+  else if (ctrl && input.key === '-') { const t = tabs.get(activeId); if (t) t.view.webContents.setZoomLevel(t.view.webContents.getZoomLevel() - 0.5); }
+  else if (ctrl && input.key === '0') { const t = tabs.get(activeId); if (t) t.view.webContents.setZoomLevel(0); }
   else if (ctrl && input.shift && input.key.toLowerCase() === 'd') { if (activeId) duplicateTab(activeId); }
   else if (input.alt && input.key === 'ArrowLeft') { const t = tabs.get(activeId); if (t && t.view.webContents.navigationHistory.canGoBack()) t.view.webContents.navigationHistory.goBack(); }
   else if (input.alt && input.key === 'ArrowRight') { const t = tabs.get(activeId); if (t && t.view.webContents.navigationHistory.canGoForward()) t.view.webContents.navigationHistory.goForward(); }
@@ -353,11 +429,18 @@ function createWindow() {
     height: 800,
     frame: false,
     transparent: false,
+    resizable: true,
     backgroundColor: '#ffffff',
-    minWidth: 480,
-    minHeight: 360
+    minWidth: MIN_WIDTH,
+    minHeight: MIN_HEIGHT
   });
   win.setTitle('Daybreak');
+  win.on('closed', () => {
+    win = null;
+    overlayView = null;
+    tabs.clear();
+    activeId = null;
+  });
 
   overlayView = new WebContentsView({
     webPreferences: {
@@ -392,7 +475,13 @@ function createWindow() {
     }
   });
 
-  win.on('resize', layout);
+  // On Windows in particular, minimizing can fire a 'resize' event reporting
+  // a bogus near-zero content size; applying that to the tab/overlay bounds
+  // leaves everything zero-sized, which is why restoring showed a blank,
+  // unclickable window. Skip layout while actually minimized, and force a
+  // fresh layout pass when the window comes back.
+  win.on('resize', () => { if (!win.isMinimized() && !windowDragging) layout(); });
+  win.on('restore', () => { layout(); });
   win.on('maximize', pushWinState);
   win.on('unmaximize', pushWinState);
 
@@ -449,11 +538,23 @@ app.whenReady().then(() => {
   });
 
   setupDownloads();
+  setupAdBlocker();
   createWindow();
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  // Flush any debounced history/downloads writes so a quit right after a
+  // burst of navigation doesn't lose the last few entries.
+  Object.keys(saveTimers).forEach((name) => {
+    clearTimeout(saveTimers[name]);
+    delete saveTimers[name];
+  });
+  saveJSON('history.json', history);
+  saveJSON('downloads.json', downloads);
 });
 
 app.on('activate', () => {
@@ -492,17 +593,97 @@ ipcMain.handle('nav:reload', (_e, id) => {
 
 // ---------------- IPC: window controls ----------------
 
-ipcMain.handle('win:minimize', () => { if (win) win.minimize(); });
+ipcMain.handle('win:minimize', () => { if (winAlive()) win.minimize(); });
 ipcMain.handle('win:maximize', () => {
-  if (!win) return;
+  if (!winAlive()) return;
   if (win.isMaximized()) win.unmaximize(); else win.maximize();
 });
-ipcMain.handle('win:close', () => { if (win) win.close(); });
-ipcMain.handle('win:isMaximized', () => (win ? win.isMaximized() : false));
+ipcMain.handle('win:close', () => { if (winAlive()) win.close(); });
+ipcMain.handle('win:isMaximized', () => (winAlive() ? win.isMaximized() : false));
 
-ipcMain.handle('ui:setOverlayExtra', (_e, extra) => {
+// Reserve extra overlay height for a floating menu/find-bar so it isn't
+// clipped at the toolbar's normal bottom edge (see the overlayExtra note
+// above layout()).
+ipcMain.on('ui:setOverlayExtra', (_e, extra) => {
   overlayExtra = Math.max(0, Number(extra) || 0);
   layout();
+});
+
+// Manual window dragging (BaseWindow + multiple WebContentsViews doesn't
+// reliably honor -webkit-app-region: drag, so the tab row implements this
+// itself using real screen coordinates from mouse events). This only needs
+// mousedown/mousemove within the toolbar's own bounds, so — unlike resize —
+// it doesn't need the overlay to cover the full window.
+ipcMain.handle('win:getPosition', () => (winAlive() ? win.getPosition() : [0, 0]));
+ipcMain.on('win:setPosition', (_e, { x, y }) => {
+  if (!winAlive()) return;
+  if (dragFixedSize) {
+    // Explicitly re-assert the size we started the drag with on every
+    // single move. Something during a drag — crossing monitors with
+    // different DPI scaling, or Windows silently restoring a previous
+    // pre-snap size — was letting the window grow, even though nothing in
+    // this app ever asks for that. Pinning width/height on every update
+    // corrects it within one frame instead of trying to prevent whatever
+    // is causing it.
+    win.setBounds({ x: Math.round(x), y: Math.round(y), width: dragFixedSize.width, height: dragFixedSize.height });
+  } else {
+    win.setPosition(Math.round(x), Math.round(y), false);
+  }
+});
+ipcMain.on('win:dragStart', () => {
+  windowDragging = true;
+  if (winAlive()) {
+    // Also turn off resizing for the duration — belt-and-suspenders against
+    // Windows Snap Assist, which targets resizable windows moved near a
+    // screen edge, on top of the explicit size-pinning above.
+    win.setResizable(false);
+    const b = win.getBounds();
+    dragFixedSize = { width: b.width, height: b.height };
+  }
+});
+ipcMain.on('win:dragEnd', () => {
+  windowDragging = false;
+  dragFixedSize = null;
+  if (winAlive()) win.setResizable(true);
+  layout(); // catch up on anything a suppressed resize event would have applied
+});
+
+// Note on resizing: a custom in-page resize-handle scheme would need the
+// overlay to cover the whole window with click-through for everywhere else,
+// but WebContentsView has no setIgnoreMouseEvents/click-through mechanism
+// to make that safe (that's what crashed here). So resizing relies on the
+// native OS resize border instead — BaseWindow is still constructed with
+// resizable: true, and Electron keeps a frameless window's edges
+// grab-able for resize even with no visible frame.
+
+// ---------------- IPC: find in page ----------------
+
+ipcMain.handle('find:start', (_e, { id, text, forward }) => {
+  const tab = tabs.get(id);
+  if (tab && text) tab.view.webContents.findInPage(text, { forward: forward !== false, findNext: false });
+});
+ipcMain.handle('find:next', (_e, { id, text, forward }) => {
+  const tab = tabs.get(id);
+  if (tab && text) tab.view.webContents.findInPage(text, { forward: forward !== false, findNext: true });
+});
+ipcMain.handle('find:stop', (_e, id) => {
+  const tab = tabs.get(id);
+  if (tab) tab.view.webContents.stopFindInPage('clearSelection');
+});
+
+// ---------------- IPC: zoom ----------------
+
+ipcMain.handle('zoom:in', (_e, id) => {
+  const tab = tabs.get(id);
+  if (tab) tab.view.webContents.setZoomLevel(tab.view.webContents.getZoomLevel() + 0.5);
+});
+ipcMain.handle('zoom:out', (_e, id) => {
+  const tab = tabs.get(id);
+  if (tab) tab.view.webContents.setZoomLevel(tab.view.webContents.getZoomLevel() - 0.5);
+});
+ipcMain.handle('zoom:reset', (_e, id) => {
+  const tab = tabs.get(id);
+  if (tab) tab.view.webContents.setZoomLevel(0);
 });
 
 // ---------------- IPC: bookmarks ----------------

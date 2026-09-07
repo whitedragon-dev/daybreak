@@ -21,8 +21,24 @@ contextBridge.exposeInMainWorld('api', {
   closeWindow: () => ipcRenderer.invoke('win:close'),
   isMaximized: () => ipcRenderer.invoke('win:isMaximized'),
 
-  // let the overlay temporarily grow to fit floating UI (e.g. an open menu)
-  setOverlayExtra: (px) => ipcRenderer.invoke('ui:setOverlayExtra', px),
+  // reserve extra overlay height for a floating menu/find-bar (see main.js)
+  setOverlayExtra: (px) => ipcRenderer.send('ui:setOverlayExtra', px),
+
+  // manual window drag (fire-and-forget for smooth tracking)
+  getWindowPosition: () => ipcRenderer.invoke('win:getPosition'),
+  setWindowPosition: (x, y) => ipcRenderer.send('win:setPosition', { x, y }),
+  windowDragStart: () => ipcRenderer.send('win:dragStart'),
+  windowDragEnd: () => ipcRenderer.send('win:dragEnd'),
+
+  // find in page
+  findStart: (id, text, forward) => ipcRenderer.invoke('find:start', { id, text, forward }),
+  findNext: (id, text, forward) => ipcRenderer.invoke('find:next', { id, text, forward }),
+  findStop: (id) => ipcRenderer.invoke('find:stop', id),
+
+  // zoom
+  zoomIn: (id) => ipcRenderer.invoke('zoom:in', id),
+  zoomOut: (id) => ipcRenderer.invoke('zoom:out', id),
+  zoomReset: (id) => ipcRenderer.invoke('zoom:reset', id),
 
   // bookmarks
   getBookmarks: () => ipcRenderer.invoke('bookmarks:list'),
@@ -30,7 +46,7 @@ contextBridge.exposeInMainWorld('api', {
   removeBookmark: (id) => ipcRenderer.invoke('bookmarks:remove', id),
   removeBookmarkByUrl: (url) => ipcRenderer.invoke('bookmarks:removeByUrl', url),
 
-  // settings
+  // settings (adBlockEnabled lives in here too — see settings:get/set in main.js)
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (partial) => ipcRenderer.invoke('settings:set', partial),
 
@@ -49,5 +65,20 @@ contextBridge.exposeInMainWorld('api', {
     const listener = () => callback();
     ipcRenderer.on('focus-urlbar', listener);
     return () => ipcRenderer.removeListener('focus-urlbar', listener);
+  },
+  onFindOpen: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('find:open', listener);
+    return () => ipcRenderer.removeListener('find:open', listener);
+  },
+  onFindResult: (callback) => {
+    const listener = (_event, result) => callback(result);
+    ipcRenderer.on('find:result', listener);
+    return () => ipcRenderer.removeListener('find:result', listener);
+  },
+  onBookmarkToggleRequest: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('bookmark:toggle-request', listener);
+    return () => ipcRenderer.removeListener('bookmark:toggle-request', listener);
   }
 });

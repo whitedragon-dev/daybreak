@@ -226,6 +226,8 @@ function historyPage() {
 function settingsPage() {
   const body = `
     <h1>Settings</h1>
+    <div class="row"><div class="main"><div class="title">Block ads &amp; trackers</div><div class="url">Blocks known ad/tracker domains across all tabs</div></div>
+      <input type="checkbox" id="adBlockEnabled"></div>
     <div class="row"><div class="main"><div class="title">Homepage / new tab</div></div>
       <input type="text" id="homepage" style="max-width:280px" placeholder="daybreak://newtab"></div>
     <div class="row"><div class="main"><div class="title">Default search engine</div></div>
@@ -249,6 +251,7 @@ function settingsPage() {
   const script = `
     function load() {
       window.internalAPI.getSettings().then(function (s) {
+        document.getElementById('adBlockEnabled').checked = s.adBlockEnabled !== false;
         document.getElementById('homepage').value = s.homepage || 'daybreak://newtab';
         document.getElementById('searchEngine').value = s.searchEngine || 'google';
         document.getElementById('showBookmarksBar').checked = !!s.showBookmarksBar;
@@ -258,6 +261,7 @@ function settingsPage() {
     load();
     document.getElementById('saveBtn').addEventListener('click', function () {
       window.internalAPI.setSettings({
+        adBlockEnabled: document.getElementById('adBlockEnabled').checked,
         homepage: document.getElementById('homepage').value.trim() || 'daybreak://newtab',
         searchEngine: document.getElementById('searchEngine').value,
         showBookmarksBar: document.getElementById('showBookmarksBar').checked,
