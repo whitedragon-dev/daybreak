@@ -94,6 +94,7 @@
   body.dark .tab:hover:not(.active) { background: rgba(255,255,255,0.08); }
   .tab.active { background: var(--bg); color: var(--text); }
   .tab.pinned { min-width: 32px; max-width: 32px; padding: 0; justify-content: center; }
+  .tab.tab-dragging { opacity: 0.5; cursor: grabbing; }
   .tab .tab-monogram {
     width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
@@ -346,14 +347,26 @@
   // load), which is what looked like constant flashing.
   var tabElById = {};
   var tabSigById = {}; // last-rendered signature per tab, to skip no-op rebuilds
+  var tabDrag = null; // { id, startX, startY, dragging, pinned, el }
+  var suppressNextTabClick = false;
+  var TAB_DRAG_THRESHOLD = 5;
 
   function ensureTabElement(tab) {
     var el = tabElById[tab.id];
     if (el) return el;
     el = document.createElement('div');
-    el.addEventListener('click', function () { window.api.switchTab(tab.id); });
+    el.dataset.tabId = tab.id;
+    el.addEventListener('click', function () {
+      if (suppressNextTabClick) { suppressNextTabClick = false; return; }
+      window.api.switchTab(tab.id);
+    });
     el.addEventListener('mousedown', function (e) {
-      if (e.button === 1) { e.preventDefault(); window.api.closeTab(tab.id); } // middle-click closes
+      if (e.button === 1) { e.preventDefault(); window.api.closeTab(tab.id); return; } // middle-click closes
+      if (e.button !== 0) return;
+      if (e.target.closest('.tab-close')) return;
+      var current = state.tabs.find(function (t) { return t.id === tab.id; });
+      if (!current) return;
+      tabDrag = { id: tab.id, startX: e.clientX, startY: e.clientY, dragging: false, pinned: !!current.pinned, el: el };
     });
     el.addEventListener('contextmenu', function (e) {
       e.preventDefault();
@@ -401,6 +414,12 @@
   }
 
   function renderTabs() {
+    // Don't let a background state push (another tab's spinner, etc.) fight
+    // the live drag-reorder preview below — it would snap the dragged tab
+    // back to its pre-drag position mid-gesture. Normal rendering resumes
+    // the instant the drag ends.
+    if (tabDrag && tabDrag.dragging) return;
+
     var ordered = orderedTabs();
     var seen = {};
     ordered.forEach(function (tab) {
@@ -420,6 +439,37 @@
       if (!seen[id]) { tabElById[id].remove(); delete tabElById[id]; delete tabSigById[id]; }
     });
   }
+
+  // ---- tab drag-to-reorder ----
+  // Pinned and unpinned tabs stay in their own groups (matches how they're
+  // displayed) — a tab can only be reordered among others of the same kind.
+  document.addEventListener('mousemove', function (e) {
+    if (!tabDrag) return;
+    var dx = e.clientX - tabDrag.startX, dy = e.clientY - tabDrag.startY;
+    if (!tabDrag.dragging) {
+      if (Math.abs(dx) < TAB_DRAG_THRESHOLD && Math.abs(dy) < TAB_DRAG_THRESHOLD) return;
+      tabDrag.dragging = true;
+      tabDrag.el.classList.add('tab-dragging');
+    }
+    var overEl = document.elementFromPoint(e.clientX, e.clientY);
+    var overTab = overEl ? overEl.closest('.tab') : null;
+    if (!overTab || overTab === tabDrag.el) return;
+    if (overTab.classList.contains('pinned') !== tabDrag.pinned) return; // don't cross the pinned/unpinned boundary
+    var rect = overTab.getBoundingClientRect();
+    var placeBefore = e.clientX < rect.left + rect.width / 2;
+    tabstrip.insertBefore(tabDrag.el, placeBefore ? overTab : overTab.nextSibling);
+  });
+
+  document.addEventListener('mouseup', function () {
+    if (!tabDrag) return;
+    if (tabDrag.dragging) {
+      tabDrag.el.classList.remove('tab-dragging');
+      suppressNextTabClick = true;
+      var orderedIds = Array.prototype.map.call(tabstrip.children, function (child) { return child.dataset.tabId; });
+      window.api.reorderTabs(orderedIds);
+    }
+    tabDrag = null;
+  });
 
   function renderToolbarState() {
     var active = activeTab();

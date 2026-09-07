@@ -335,7 +335,11 @@ function createTab(url, opts) {
     pushState();
   });
 
-  wc.on('did-navigate-in-page', (_e, navUrl) => { tab.url = navUrl; pushState(); });
+  wc.on('did-navigate-in-page', (_e, navUrl, isMainFrame) => {
+    if (!isMainFrame) return; // ads/widgets/trackers embedded as iframes fire this too — ignore those
+    tab.url = navUrl;
+    pushState();
+  });
 
   wc.on('page-title-updated', (_e, title) => {
     tab.title = title;
@@ -398,6 +402,21 @@ function togglePinTab(id) {
   if (!tab) return;
   tab.pinned = !tab.pinned;
   pushState();
+}
+
+function reorderTabs(orderedIds) {
+  // The UI always groups pinned tabs before unpinned ones, so enforce that
+  // here regardless of what order the renderer's drag gesture produced —
+  // this is the source of truth, not a mirror of it.
+  const pinnedIds = orderedIds.filter((id) => tabs.has(id) && tabs.get(id).pinned);
+  const unpinnedIds = orderedIds.filter((id) => tabs.has(id) && !tabs.get(id).pinned);
+  const finalOrder = [...pinnedIds, ...unpinnedIds];
+  const missing = [...tabs.keys()].filter((id) => !finalOrder.includes(id));
+
+  const newMap = new Map();
+  [...finalOrder, ...missing].forEach((id) => { if (tabs.has(id)) newMap.set(id, tabs.get(id)); });
+  tabs.clear();
+  newMap.forEach((v, k) => tabs.set(k, v));
 }
 
 // ---------------- keyboard shortcuts ----------------
@@ -569,6 +588,11 @@ ipcMain.handle('tabs:close', (_e, id) => { closeTab(id); });
 ipcMain.handle('tabs:closeOthers', (_e, id) => { closeOtherTabs(id); });
 ipcMain.handle('tabs:duplicate', (_e, id) => { duplicateTab(id); });
 ipcMain.handle('tabs:togglePin', (_e, id) => { togglePinTab(id); });
+ipcMain.on('tabs:reorder', (_e, orderedIds) => {
+  if (!Array.isArray(orderedIds)) return;
+  reorderTabs(orderedIds);
+  pushState();
+});
 
 ipcMain.handle('nav:go', (_e, { id, url }) => {
   const tab = tabs.get(id);

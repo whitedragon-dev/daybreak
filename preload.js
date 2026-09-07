@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('api', {
   closeOtherTabs: (id) => ipcRenderer.invoke('tabs:closeOthers', id),
   duplicateTab: (id) => ipcRenderer.invoke('tabs:duplicate', id),
   togglePinTab: (id) => ipcRenderer.invoke('tabs:togglePin', id),
+  reorderTabs: (orderedIds) => ipcRenderer.send('tabs:reorder', orderedIds),
 
   // navigation
   navigate: (id, url) => ipcRenderer.invoke('nav:go', { id, url }),
