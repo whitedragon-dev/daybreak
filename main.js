@@ -4,6 +4,17 @@ const fs = require('fs');
 const { randomUUID } = require('crypto');
 const pages = require('./pages.js');
 
+// Most of what shows up in the terminal when running via `npm start` is
+// Chromium's own low-level network-stack logging (STUN lookups failing for
+// ad-network hosts that are now blocked, SSL handshake noise from those
+// same hosts, internal debug markers) — normally invisible in a packaged
+// app because nothing is attached to stdout/stderr to display it. It's
+// expected side-effect noise from blocking those hosts, not an error in
+// this app, but there's no reason to leave it this verbose in a dev
+// console. Must be set before the app is ready.
+app.commandLine.appendSwitch('log-level', '3'); // fatal only
+app.commandLine.appendSwitch('disable-logging');
+
 const TAB_ROW_HEIGHT = 36;
 const NAV_ROW_HEIGHT = 40;
 const BOOKMARKS_BAR_HEIGHT = 32;
@@ -267,8 +278,36 @@ const AD_BLOCK_HOSTS = [
   'analytics.twitter.com', 'ads.linkedin.com', 'bat.bing.com', 'hotjar.com',
   'mixpanel.com', 'segment.com', 'segment.io', 'branch.io', 'appsflyer.com',
   'adform.net', 'adroll.com', 'yieldmo.com', 'sharethrough.com', 'media.net',
-  'smartadserver.com', 'casalemedia.com', 'contextweb.com', 'bidswitch.net'
+  'smartadserver.com', 'casalemedia.com', 'contextweb.com', 'bidswitch.net',
+  // added after reviewing real ad-exchange/sync traffic from a live session
+  'lijit.com', '360yield.com', 'fwmrm.net', 'e-planning.net', 'indexww.com',
+  'eskimi.com', 'gumgum.com', 'everesttech.net', 'programmaticx.ai',
+  'richaudience.com', 'cootlogix.com', '33across.com', 'connectad.io',
+  'vidazoo.com', 'loopme.me', 'minutemedia-prebid.com', 'technoratimedia.com',
+  'adkernel.com', 'sparteo.com', 'admatic.de', 'yellowblue.io', 'bricks-co.com',
+  'pixad.com.tr', 'rbstsystems.live', 'omnitagjs.com', 'dv.tech',
+  'servenobid.com', 'nextmillmedia.com', 'ingage.tech', 'ssp.disqus.com',
+  'adsafeprotected.com', 'doubleverify.com', 'serving-sys.com',
+  'flashtalking.com', '3lift.com', 'sonobi.com', 'spotxchange.com', 'springserve.com'
 ];
+
+// A hostname blocklist only ever catches ads served from a separately
+// blockable domain — it cannot do anything about ad containers rendered
+// from the page's own first-party markup (a common pattern for native/
+// in-feed ads). This is a conservative, well-known set of ad-specific
+// selectors — narrow enough that it shouldn't hide unrelated content —
+// injected as CSS rather than removed from the DOM, so it can't break a
+// page's own script logic that expects the element to still exist.
+const AD_COSMETIC_CSS = `
+  .adsbygoogle, ins.adsbygoogle,
+  div[id^="google_ads_iframe"], iframe[id^="google_ads_iframe"],
+  div[id^="div-gpt-ad"], div[id*="dfp-ad"],
+  [id^="taboola-"], [class*="taboola"],
+  [id^="outbrain"], .OUTBRAIN,
+  [class*="ad-slot"], [class*="ad-container"], [class*="ad-banner"],
+  [class^="sponsored-content"], [data-ad-slot], [data-ad-unit]
+  { display: none !important; }
+`;
 
 let adBlockHandlerAttached = false;
 
@@ -354,6 +393,37 @@ function createTab(url, opts) {
   wc.on('context-menu', (_e, params) => { buildPageContextMenu(wc, params).popup({ window: win }); });
   wc.on('found-in-page', (_e, result) => {
     if (overlayAlive()) overlayView.webContents.send('find:result', { tabId: id, matches: result.matches, activeMatch: result.activeMatchOrdinal });
+  });
+
+  // This — not the request-blocklist above — is what actually stops popup
+  // ads. window.open() is a completely separate code path from the
+  // sub-resource requests webRequest sees: without a handler here,
+  // Electron's default behavior lets a page spawn a real, uncontrolled
+  // native window for any window.open() call, which the request blocker
+  // can only ever partially clean out from the inside (hence ad images
+  // disappearing while the popup itself still opened). A known ad host is
+  // denied outright; anything else is opened as a normal Daybreak tab
+  // instead of a separate native window, which also covers legitimate
+  // cases like an OAuth login popup without leaving an ungoverned window
+  // outside the tab system.
+  wc.setWindowOpenHandler(({ url }) => {
+    if (!settings.adBlockEnabled) { createTab(url); return { action: 'deny' }; }
+    let hostname = '';
+    try { hostname = new URL(url).hostname; } catch (e) { /* ignore */ }
+    if (hostMatchesBlockList(hostname)) return { action: 'deny' };
+    createTab(url);
+    return { action: 'deny' };
+  });
+
+  // Blocked/cancelled sub-resource loads (exactly what the ad blocker
+  // produces constantly) trigger Electron's own noisy default warning
+  // ("electron: Failed to load URL ... with error: ...") on every single
+  // one unless something is listening for this event. The failures
+  // themselves are expected and harmless; only the console spam is not.
+  wc.on('did-fail-load', () => {});
+
+  wc.on('dom-ready', () => {
+    if (settings.adBlockEnabled) wc.insertCSS(AD_COSMETIC_CSS).catch(() => {});
   });
 
   wc.loadURL(normalizeUrl(initialUrl));
