@@ -341,6 +341,9 @@ function aboutPage() {
         Chromium ${process.versions.chrome || '—'}<br>
         Node ${process.versions.node || '—'}
       </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:24px">
+        Developer: ${pkg.author || '—'}
+      </div>
     </div>
   `;
   return shell('About', body, '');

@@ -1,5 +1,7 @@
 # Daybreak
 
+Developer: WhiteDragon-dev
+
 A minimal multi-tab desktop browser built on Electron's BaseWindow and
 WebContentsView APIs — a frameless window with a custom tab strip and
 address bar, real per-tab browsing contexts (not iframes), and a small set
@@ -99,6 +101,23 @@ domains, toggleable from Settings. This covers most third-party ad and
 tracking *requests* — but a request-blocklist alone does not stop a page
 from opening an entirely new, uncontrolled window via `window.open()`,
 which is a separate code path.
+
+---
+
+---
+
+## Building
+
+```
+npm install
+npm start          # run from source
+npm run pack        # unpacked build, for quick local testing
+npm run dist         # packaged installer for the current platform
+```
+
+`dist` uses electron-builder with the config in `package.json`'s `build`
+key, targeting NSIS on Windows, a DMG on macOS, and an AppImage on Linux —
+it builds for whichever platform you run it on, into `dist/`.
 
 ---
 

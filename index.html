@@ -87,25 +87,28 @@
     max-width: 150px;
     min-width: 64px;
     transition: background-color .12s ease, color .12s ease;
-    animation: tabIn .15s ease;
   }
-  @keyframes tabIn { from { opacity: 0; transform: translateY(4px) scale(.96); } to { opacity: 1; transform: none; } }
   .tab:hover:not(.active) { background: rgba(0,0,0,0.06); }
   body.dark .tab:hover:not(.active) { background: rgba(255,255,255,0.08); }
   .tab.active { background: var(--bg); color: var(--text); }
   .tab.pinned { min-width: 32px; max-width: 32px; padding: 0; justify-content: center; }
   .tab.tab-dragging { opacity: 0.5; cursor: grabbing; }
   .tab .tab-monogram {
+    display: none;
     width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
+    align-items: center; justify-content: center;
     font-size: 10px; font-weight: 600; color: #fff;
   }
+  .tab.pinned .tab-monogram { display: flex; }
   .tab .tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; pointer-events: none; font-size: 12px; }
+  .tab.pinned .tab-title, .tab.pinned .tab-close { display: none; }
   .tab .tab-spinner {
+    display: none;
     width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
     border: 1.5px solid var(--border); border-top-color: var(--accent);
     animation: spin .6s linear infinite;
   }
+  .tab.loading .tab-spinner { display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .tab .tab-close {
     width: 16px; height: 16px; line-height: 16px; text-align: center;
@@ -356,6 +359,35 @@
     if (el) return el;
     el = document.createElement('div');
     el.dataset.tabId = tab.id;
+
+    // Built once and reused for the tab's whole lifetime — updateTabElement
+    // only ever mutates these afterward (text/class/style), never tears
+    // down and rebuilds them, which is what was causing a visible flash on
+    // every loading/title change (even a fast one).
+    var mono = document.createElement('span');
+    mono.className = 'tab-monogram';
+    el.appendChild(mono);
+
+    var spinner = document.createElement('span');
+    spinner.className = 'tab-spinner';
+    el.appendChild(spinner);
+
+    var titleEl = document.createElement('span');
+    titleEl.className = 'tab-title';
+    el.appendChild(titleEl);
+
+    var closeEl = document.createElement('span');
+    closeEl.className = 'tab-close';
+    closeEl.textContent = '\u00d7';
+    closeEl.addEventListener('click', function (e) {
+      e.stopPropagation();
+      window.api.closeTab(tab.id);
+    });
+    el.appendChild(closeEl);
+
+    el._mono = mono;
+    el._title = titleEl;
+
     el.addEventListener('click', function () {
       if (suppressNextTabClick) { suppressNextTabClick = false; return; }
       window.api.switchTab(tab.id);
@@ -380,36 +412,18 @@
   }
 
   function updateTabElement(el, tab) {
-    el.className = 'tab' + (tab.id === state.activeId ? ' active' : '') + (tab.pinned ? ' pinned' : '');
+    el.className = 'tab' +
+      (tab.id === state.activeId ? ' active' : '') +
+      (tab.pinned ? ' pinned' : '') +
+      (tab.loading ? ' loading' : '');
     el.title = tab.url;
-    el.innerHTML = ''; // cheap: only replaces this tab's own small content, not the whole strip
 
     if (tab.pinned) {
       var host = hostOf(tab.url);
-      var mono = document.createElement('span');
-      mono.className = 'tab-monogram';
-      mono.style.background = 'hsl(' + hueFor(host) + ',55%,45%)';
-      mono.textContent = (host[0] || '?').toUpperCase();
-      el.appendChild(mono);
+      el._mono.style.background = 'hsl(' + hueFor(host) + ',55%,45%)';
+      el._mono.textContent = (host[0] || '?').toUpperCase();
     } else {
-      if (tab.loading) {
-        var spinner = document.createElement('span');
-        spinner.className = 'tab-spinner';
-        el.appendChild(spinner);
-      }
-      var titleEl = document.createElement('span');
-      titleEl.className = 'tab-title';
-      titleEl.textContent = tab.loading ? 'Loading\u2026' : (tab.title || 'New Tab');
-      el.appendChild(titleEl);
-
-      var closeEl = document.createElement('span');
-      closeEl.className = 'tab-close';
-      closeEl.textContent = '\u00d7';
-      closeEl.addEventListener('click', function (e) {
-        e.stopPropagation();
-        window.api.closeTab(tab.id);
-      });
-      el.appendChild(closeEl);
+      el._title.textContent = tab.loading ? 'Loading\u2026' : (tab.title || 'New Tab');
     }
   }
 

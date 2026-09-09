@@ -358,8 +358,25 @@ function createTab(url, opts) {
   win.contentView.addChildView(view, 0);
 
   const wc = view.webContents;
-  wc.on('did-start-loading', () => { tab.loading = true; pushState(); });
-  wc.on('did-stop-loading', () => { tab.loading = false; pushState(); });
+  wc.on('did-start-loading', () => {
+    if (tab.loadingTimer) clearTimeout(tab.loadingTimer);
+    tab.loadingTimer = setTimeout(() => {
+      tab.loadingTimer = null;
+      tab.loading = true;
+      pushState();
+    }, 150);
+  });
+  wc.on('did-stop-loading', () => {
+    if (tab.loadingTimer) {
+      clearTimeout(tab.loadingTimer);
+      tab.loadingTimer = null;
+      // The load finished before the spinner was ever due to appear —
+      // nothing was shown, so there's nothing to push to hide again.
+      if (!tab.loading) return;
+    }
+    tab.loading = false;
+    pushState();
+  });
 
   wc.on('did-navigate', (_e, navUrl) => {
     tab.url = navUrl;
@@ -443,6 +460,7 @@ function closeTab(id) {
   const tab = tabs.get(id);
   if (!tab) return;
 
+  if (tab.loadingTimer) clearTimeout(tab.loadingTimer);
   if (winAlive()) win.contentView.removeChildView(tab.view);
   if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
   tabs.delete(id);
