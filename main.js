@@ -20,6 +20,8 @@ const NAV_ROW_HEIGHT = 40;
 const BOOKMARKS_BAR_HEIGHT = 32;
 const MIN_WIDTH = 480;
 const MIN_HEIGHT = 360;
+const MEMORY_SAVER_IDLE_MS = 20 * 60 * 1000; // discard a background tab after this long unused
+const MEMORY_SAVER_SWEEP_MS = 60 * 1000; // how often to check
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'daybreak', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }
@@ -76,7 +78,7 @@ let bookmarks = loadJSON('bookmarks.json', []);
 let history = loadJSON('history.json', []);
 let downloads = loadJSON('downloads.json', []);
 let settings = Object.assign(
-  { theme: 'light', homepage: 'daybreak://newtab', searchEngine: 'google', showBookmarksBar: true, adBlockEnabled: true },
+  { theme: 'light', homepage: 'daybreak://newtab', searchEngine: 'google', showBookmarksBar: true, adBlockEnabled: true, memorySaverEnabled: true },
   loadJSON('settings.json', {})
 );
 
@@ -116,6 +118,7 @@ function layout() {
   overlayView.setBounds({ x: 0, y: 0, width, height: Math.min(height, tabTop + overlayExtra) });
 
   for (const [id, tab] of tabs) {
+    if (!tab.view) continue; // discarded by Memory Saver — nothing to lay out until revived
     if (id === activeId) {
       tab.view.setBounds({ x: 0, y: tabTop, width, height: Math.max(0, height - tabTop) });
     } else {
@@ -132,19 +135,26 @@ function serializeState() {
     settings,
     bookmarks,
     tabs: [...tabs.entries()].map(([id, tab]) => {
-      const wc = tab.view.webContents;
+      const wc = tab.view && !tab.view.webContents.isDestroyed() ? tab.view.webContents : null;
       return {
         id,
         title: tab.title || tab.url || 'New Tab',
         url: tab.url,
         loading: tab.loading,
         pinned: !!tab.pinned,
-        canGoBack: wc.isDestroyed() ? false : wc.navigationHistory.canGoBack(),
-        canGoForward: wc.isDestroyed() ? false : wc.navigationHistory.canGoForward(),
-        bookmarked: bookmarks.some((b) => b.url === tab.url)
+        discarded: !tab.view,
+        canGoBack: wc ? wc.navigationHistory.canGoBack() : false,
+        canGoForward: wc ? wc.navigationHistory.canGoForward() : false,
+        bookmarked: bookmarks.some((b) => b.url === tab.url),
+        audible: wc ? safeCall(() => wc.isCurrentlyAudible(), false) : false,
+        muted: wc ? safeCall(() => wc.isAudioMuted(), false) : false
       };
     })
   };
+}
+
+function safeCall(fn, fallback) {
+  try { return fn(); } catch (e) { return fallback; }
 }
 
 let pushStateTimer = null;
@@ -196,7 +206,7 @@ function resolveInput(input) {
 
 // ---------------- context menu (page content) ----------------
 
-function buildPageContextMenu(wc, params) {
+function buildPageContextMenu(wc, params, id) {
   const template = [];
   const editable = params.isEditable;
   const selection = (params.selectionText || '').trim();
@@ -251,6 +261,11 @@ function buildPageContextMenu(wc, params) {
   template.push(
     { type: 'separator' },
     {
+      label: safeCall(() => wc.isAudioMuted(), false) ? 'Unmute tab' : 'Mute tab',
+      click: () => { wc.setAudioMuted(!safeCall(() => wc.isAudioMuted(), false)); pushState(); }
+    },
+    { label: 'View page source', click: () => viewPageSource(wc) },
+    {
       label: 'Inspect',
       click: () => {
         wc.inspectElement(params.x, params.y);
@@ -260,6 +275,16 @@ function buildPageContextMenu(wc, params) {
   );
 
   return Menu.buildFromTemplate(template);
+}
+
+let lastViewSource = { url: '', html: '' };
+
+async function viewPageSource(wc) {
+  try {
+    const html = await wc.executeJavaScript('document.documentElement.outerHTML');
+    lastViewSource = { url: wc.getURL(), html };
+    createTab('daybreak://view-source');
+  } catch (e) { /* page refused script execution (e.g. a PDF); nothing to show */ }
 }
 
 // ---------------- ad blocker ----------------
@@ -329,10 +354,8 @@ function setupAdBlocker() {
 
 // ---------------- tabs ----------------
 
-function createTab(url, opts) {
-  if (!winAlive()) return null;
-  const id = randomUUID();
-  const view = new WebContentsView({
+function createTabView() {
+  return new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, 'tab-preload.js'),
       contextIsolation: true,
@@ -340,24 +363,15 @@ function createTab(url, opts) {
       sandbox: true
     }
   });
+}
 
-  const initialUrl = url || settings.homepage;
-  const tab = {
-    view,
-    title: 'New Tab',
-    url: initialUrl,
-    loading: false,
-    pinned: !!(opts && opts.pinned),
-    lastHistoryId: null
-  };
-  tabs.set(id, tab);
+// Wires up everything a tab's WebContentsView needs. Used both when a tab
+// is first created and when Memory Saver's discard/revive cycle gives a
+// tab a brand new view later — the two need to end up identically wired,
+// so this is the one place that logic lives.
+function attachTabListeners(id, tab) {
+  const wc = tab.view.webContents;
 
-  // Insert at the bottom of the z-order: the overlay (added once, in
-  // createWindow) must always stay visually on top so its menus can paint
-  // over the tab area instead of being covered by it.
-  win.contentView.addChildView(view, 0);
-
-  const wc = view.webContents;
   wc.on('did-start-loading', () => {
     if (tab.loadingTimer) clearTimeout(tab.loadingTimer);
     tab.loadingTimer = setTimeout(() => {
@@ -406,8 +420,12 @@ function createTab(url, opts) {
     pushState();
   });
 
+  // Drives the tab-strip mute/speaker indicator.
+  wc.on('media-started-playing', () => pushState());
+  wc.on('media-paused', () => pushState());
+
   wc.on('before-input-event', (_e, input) => handleShortcut(input, id));
-  wc.on('context-menu', (_e, params) => { buildPageContextMenu(wc, params).popup({ window: win }); });
+  wc.on('context-menu', (_e, params) => { buildPageContextMenu(wc, params, id).popup({ window: win }); });
   wc.on('found-in-page', (_e, result) => {
     if (overlayAlive()) overlayView.webContents.send('find:result', { tabId: id, matches: result.matches, activeMatch: result.activeMatchOrdinal });
   });
@@ -442,18 +460,90 @@ function createTab(url, opts) {
   wc.on('dom-ready', () => {
     if (settings.adBlockEnabled) wc.insertCSS(AD_COSMETIC_CSS).catch(() => {});
   });
+}
 
-  wc.loadURL(normalizeUrl(initialUrl));
+function createTab(url, opts) {
+  if (!winAlive()) return null;
+  const id = randomUUID();
+  const view = createTabView();
+
+  const initialUrl = url || settings.homepage;
+  const tab = {
+    view,
+    title: 'New Tab',
+    url: initialUrl,
+    loading: false,
+    pinned: !!(opts && opts.pinned),
+    lastHistoryId: null,
+    lastActiveAt: Date.now()
+  };
+  tabs.set(id, tab);
+
+  // Insert at the bottom of the z-order: the overlay (added once, in
+  // createWindow) must always stay visually on top so its menus can paint
+  // over the tab area instead of being covered by it.
+  win.contentView.addChildView(view, 0);
+
+  attachTabListeners(id, tab);
+  view.webContents.loadURL(normalizeUrl(initialUrl));
 
   setActiveTab(id);
   return id;
 }
 
+// Memory Saver: frees a background tab's actual browsing process/view while
+// keeping its title, URL, and position in the tab strip — Chrome calls this
+// tab discarding. Never touches the active tab, a pinned tab, or one that's
+// currently playing audio.
+function discardTab(id) {
+  const tab = tabs.get(id);
+  if (!tab || !tab.view || tab.pinned || id === activeId) return;
+  if (safeCall(() => tab.view.webContents.isCurrentlyAudible(), false)) return;
+
+  if (tab.loadingTimer) { clearTimeout(tab.loadingTimer); tab.loadingTimer = null; }
+  if (winAlive()) win.contentView.removeChildView(tab.view);
+  if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
+  tab.view = null;
+  tab.loading = false;
+  pushState();
+}
+
+// Gives a discarded tab a fresh view and reloads it. Called automatically
+// the moment the tab becomes active again — from the user's side this is
+// meant to be invisible other than a brief reload.
+function reviveTab(id) {
+  const tab = tabs.get(id);
+  if (!tab || tab.view || !winAlive()) return;
+  tab.view = createTabView();
+  win.contentView.addChildView(tab.view, 0);
+  attachTabListeners(id, tab);
+  tab.view.webContents.loadURL(normalizeUrl(tab.url));
+}
+
 function setActiveTab(id) {
-  if (!tabs.has(id)) return;
+  const tab = tabs.get(id);
+  if (!tab) return;
+  if (!tab.view) reviveTab(id);
+  tab.lastActiveAt = Date.now();
   activeId = id;
   layout();
   pushState();
+}
+
+// Chrome calls this "Memory Saver": free the actual browsing process/view
+// behind any tab that's been sitting in the background long enough,
+// without closing the tab itself. Never touches the active tab (checked
+// inside discardTab), a pinned tab, or one currently playing audio.
+function startMemorySaver() {
+  setInterval(() => {
+    if (!settings.memorySaverEnabled) return;
+    const cutoff = Date.now() - MEMORY_SAVER_IDLE_MS;
+    for (const [id, tab] of tabs) {
+      if (id === activeId || tab.pinned || !tab.view) continue;
+      if ((tab.lastActiveAt || 0) > cutoff) continue;
+      discardTab(id);
+    }
+  }, MEMORY_SAVER_SWEEP_MS);
 }
 
 function closeTab(id) {
@@ -461,8 +551,10 @@ function closeTab(id) {
   if (!tab) return;
 
   if (tab.loadingTimer) clearTimeout(tab.loadingTimer);
-  if (winAlive()) win.contentView.removeChildView(tab.view);
-  if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
+  if (tab.view) {
+    if (winAlive()) win.contentView.removeChildView(tab.view);
+    if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
+  }
   tabs.delete(id);
 
   if (activeId === id) {
@@ -515,16 +607,21 @@ function handleShortcut(input, sourceTabId) {
 
   if (ctrl && input.key.toLowerCase() === 't') { createTab(settings.homepage); }
   else if (ctrl && input.key.toLowerCase() === 'w') { closeTab(sourceTabId || activeId); }
-  else if (ctrl && input.key.toLowerCase() === 'r') { const t = tabs.get(activeId); if (t) t.view.webContents.reload(); }
+  else if (ctrl && input.key.toLowerCase() === 'r') { const t = tabs.get(activeId); if (t && t.view) t.view.webContents.reload(); }
   else if (ctrl && input.key.toLowerCase() === 'l') { if (overlayAlive()) overlayView.webContents.send('focus-urlbar'); }
   else if (ctrl && input.key.toLowerCase() === 'f') { if (overlayAlive()) overlayView.webContents.send('find:open'); }
+  else if (ctrl && input.key.toLowerCase() === 'u') { const t = tabs.get(activeId); if (t && t.view) viewPageSource(t.view.webContents); }
   else if (ctrl && input.key.toLowerCase() === 'd') { const t = tabs.get(activeId); if (t && overlayAlive()) overlayView.webContents.send('bookmark:toggle-request'); }
-  else if (ctrl && (input.key === '=' || input.key === '+')) { const t = tabs.get(activeId); if (t) t.view.webContents.setZoomLevel(t.view.webContents.getZoomLevel() + 0.5); }
-  else if (ctrl && input.key === '-') { const t = tabs.get(activeId); if (t) t.view.webContents.setZoomLevel(t.view.webContents.getZoomLevel() - 0.5); }
-  else if (ctrl && input.key === '0') { const t = tabs.get(activeId); if (t) t.view.webContents.setZoomLevel(0); }
+  else if (ctrl && (input.key === '=' || input.key === '+')) { const t = tabs.get(activeId); if (t && t.view) t.view.webContents.setZoomLevel(t.view.webContents.getZoomLevel() + 0.5); }
+  else if (ctrl && input.key === '-') { const t = tabs.get(activeId); if (t && t.view) t.view.webContents.setZoomLevel(t.view.webContents.getZoomLevel() - 0.5); }
+  else if (ctrl && input.key === '0') { const t = tabs.get(activeId); if (t && t.view) t.view.webContents.setZoomLevel(0); }
   else if (ctrl && input.shift && input.key.toLowerCase() === 'd') { if (activeId) duplicateTab(activeId); }
-  else if (input.alt && input.key === 'ArrowLeft') { const t = tabs.get(activeId); if (t && t.view.webContents.navigationHistory.canGoBack()) t.view.webContents.navigationHistory.goBack(); }
-  else if (input.alt && input.key === 'ArrowRight') { const t = tabs.get(activeId); if (t && t.view.webContents.navigationHistory.canGoForward()) t.view.webContents.navigationHistory.goForward(); }
+  else if (ctrl && input.shift && input.key.toLowerCase() === 'm') {
+    const t = tabs.get(activeId);
+    if (t && t.view) { t.view.webContents.setAudioMuted(!safeCall(() => t.view.webContents.isAudioMuted(), false)); pushState(); }
+  }
+  else if (input.alt && input.key === 'ArrowLeft') { const t = tabs.get(activeId); if (t && t.view && t.view.webContents.navigationHistory.canGoBack()) t.view.webContents.navigationHistory.goBack(); }
+  else if (input.alt && input.key === 'ArrowRight') { const t = tabs.get(activeId); if (t && t.view && t.view.webContents.navigationHistory.canGoForward()) t.view.webContents.navigationHistory.goForward(); }
   else return;
 }
 
@@ -639,6 +736,7 @@ app.whenReady().then(() => {
     else if (host === 'settings') html = pages.settingsPage();
     else if (host === 'downloads') html = pages.downloadsPage();
     else if (host === 'about') html = pages.aboutPage();
+    else if (host === 'view-source') html = pages.viewSourcePage(lastViewSource.url, lastViewSource.html);
     else return new Response('Not found', { status: 404 });
 
     return new Response(html, { headers: { 'content-type': 'text/html' } });
@@ -647,6 +745,7 @@ app.whenReady().then(() => {
   setupDownloads();
   setupAdBlocker();
   createWindow();
+  startMemorySaver();
 });
 
 app.on('window-all-closed', () => {
@@ -676,6 +775,14 @@ ipcMain.handle('tabs:close', (_e, id) => { closeTab(id); });
 ipcMain.handle('tabs:closeOthers', (_e, id) => { closeOtherTabs(id); });
 ipcMain.handle('tabs:duplicate', (_e, id) => { duplicateTab(id); });
 ipcMain.handle('tabs:togglePin', (_e, id) => { togglePinTab(id); });
+ipcMain.handle('tabs:toggleMute', (_e, id) => {
+  const tab = tabs.get(id);
+  if (tab && tab.view) { tab.view.webContents.setAudioMuted(!safeCall(() => tab.view.webContents.isAudioMuted(), false)); pushState(); }
+});
+ipcMain.handle('tabs:viewSource', (_e, id) => {
+  const tab = tabs.get(id);
+  if (tab && tab.view) viewPageSource(tab.view.webContents);
+});
 ipcMain.on('tabs:reorder', (_e, orderedIds) => {
   if (!Array.isArray(orderedIds)) return;
   reorderTabs(orderedIds);
@@ -684,23 +791,22 @@ ipcMain.on('tabs:reorder', (_e, orderedIds) => {
 
 ipcMain.handle('nav:go', (_e, { id, url }) => {
   const tab = tabs.get(id);
-  if (!tab) return;
-  tab.view.webContents.loadURL(resolveInput(url));
+  if (tab && tab.view) tab.view.webContents.loadURL(resolveInput(url));
 });
 
 ipcMain.handle('nav:back', (_e, id) => {
   const tab = tabs.get(id);
-  if (tab && tab.view.webContents.navigationHistory.canGoBack()) tab.view.webContents.navigationHistory.goBack();
+  if (tab && tab.view && tab.view.webContents.navigationHistory.canGoBack()) tab.view.webContents.navigationHistory.goBack();
 });
 
 ipcMain.handle('nav:forward', (_e, id) => {
   const tab = tabs.get(id);
-  if (tab && tab.view.webContents.navigationHistory.canGoForward()) tab.view.webContents.navigationHistory.goForward();
+  if (tab && tab.view && tab.view.webContents.navigationHistory.canGoForward()) tab.view.webContents.navigationHistory.goForward();
 });
 
 ipcMain.handle('nav:reload', (_e, id) => {
   const tab = tabs.get(id);
-  if (tab) tab.view.webContents.reload();
+  if (tab && tab.view) tab.view.webContents.reload();
 });
 
 // ---------------- IPC: window controls ----------------
@@ -772,30 +878,30 @@ ipcMain.on('win:dragEnd', () => {
 
 ipcMain.handle('find:start', (_e, { id, text, forward }) => {
   const tab = tabs.get(id);
-  if (tab && text) tab.view.webContents.findInPage(text, { forward: forward !== false, findNext: false });
+  if (tab && tab.view && text) tab.view.webContents.findInPage(text, { forward: forward !== false, findNext: false });
 });
 ipcMain.handle('find:next', (_e, { id, text, forward }) => {
   const tab = tabs.get(id);
-  if (tab && text) tab.view.webContents.findInPage(text, { forward: forward !== false, findNext: true });
+  if (tab && tab.view && text) tab.view.webContents.findInPage(text, { forward: forward !== false, findNext: true });
 });
 ipcMain.handle('find:stop', (_e, id) => {
   const tab = tabs.get(id);
-  if (tab) tab.view.webContents.stopFindInPage('clearSelection');
+  if (tab && tab.view) tab.view.webContents.stopFindInPage('clearSelection');
 });
 
 // ---------------- IPC: zoom ----------------
 
 ipcMain.handle('zoom:in', (_e, id) => {
   const tab = tabs.get(id);
-  if (tab) tab.view.webContents.setZoomLevel(tab.view.webContents.getZoomLevel() + 0.5);
+  if (tab && tab.view) tab.view.webContents.setZoomLevel(tab.view.webContents.getZoomLevel() + 0.5);
 });
 ipcMain.handle('zoom:out', (_e, id) => {
   const tab = tabs.get(id);
-  if (tab) tab.view.webContents.setZoomLevel(tab.view.webContents.getZoomLevel() - 0.5);
+  if (tab && tab.view) tab.view.webContents.setZoomLevel(tab.view.webContents.getZoomLevel() - 0.5);
 });
 ipcMain.handle('zoom:reset', (_e, id) => {
   const tab = tabs.get(id);
-  if (tab) tab.view.webContents.setZoomLevel(0);
+  if (tab && tab.view) tab.view.webContents.setZoomLevel(0);
 });
 
 // ---------------- IPC: bookmarks ----------------

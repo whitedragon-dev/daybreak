@@ -74,6 +74,7 @@
   #tabstrip::-webkit-scrollbar { display: none; }
 
   .tab {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -110,6 +111,19 @@
   }
   .tab.loading .tab-spinner { display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .tab .tab-mute {
+    display: none;
+    font-size: 11px; flex-shrink: 0; color: var(--accent); cursor: pointer;
+    width: 14px; text-align: center; border-radius: 3px;
+  }
+  .tab.audible .tab-mute, .tab.muted .tab-mute { display: inline-block; }
+  .tab.muted .tab-mute { color: var(--text-dim); }
+  .tab .tab-mute:hover { background: rgba(0,0,0,0.08); }
+  body.dark .tab .tab-mute:hover { background: rgba(255,255,255,0.12); }
+  .tab.pinned .tab-mute { position: absolute; bottom: 1px; right: 1px; font-size: 8px; width: auto; }
+  /* A discarded (Memory Saver) tab is unchanged visually except a slightly
+     dimmed title — it's still a real tab, just not currently running. */
+  .tab.discarded .tab-title { opacity: 0.65; }
   .tab .tab-close {
     width: 16px; height: 16px; line-height: 16px; text-align: center;
     border-radius: 3px; color: inherit; opacity: 0.55; flex-shrink: 0; font-size: 13px;
@@ -277,6 +291,7 @@
     <div class="menu-item" id="menuHistory">History</div>
     <div class="menu-item" id="menuDownloads">Downloads</div>
     <div class="menu-item" id="menuFind">Find in page<span>Ctrl+F</span></div>
+    <div class="menu-item" id="menuViewSource">View page source<span>Ctrl+U</span></div>
     <div class="menu-divider"></div>
     <div class="menu-item" id="menuZoomOut">Zoom out<span>Ctrl+-</span></div>
     <div class="menu-item" id="menuZoomReset">Reset zoom<span>Ctrl+0</span></div>
@@ -292,6 +307,7 @@
     <div class="menu-item" id="ctxReload">Reload</div>
     <div class="menu-item" id="ctxDuplicate">Duplicate tab</div>
     <div class="menu-item" id="ctxPin">Pin tab</div>
+    <div class="menu-item" id="ctxMute">Mute tab</div>
     <div class="menu-divider"></div>
     <div class="menu-item" id="ctxCloseOthers">Close other tabs</div>
     <div class="menu-item danger" id="ctxClose">Close tab<span>Ctrl+W</span></div>
@@ -376,6 +392,15 @@
     titleEl.className = 'tab-title';
     el.appendChild(titleEl);
 
+    var muteEl = document.createElement('span');
+    muteEl.className = 'tab-mute';
+    muteEl.textContent = '\u266a'; // eighth note — a plain symbol, not an emoji glyph
+    muteEl.addEventListener('click', function (e) {
+      e.stopPropagation();
+      window.api.toggleMuteTab(tab.id);
+    });
+    el.appendChild(muteEl);
+
     var closeEl = document.createElement('span');
     closeEl.className = 'tab-close';
     closeEl.textContent = '\u00d7';
@@ -415,7 +440,10 @@
     el.className = 'tab' +
       (tab.id === state.activeId ? ' active' : '') +
       (tab.pinned ? ' pinned' : '') +
-      (tab.loading ? ' loading' : '');
+      (tab.loading ? ' loading' : '') +
+      (tab.discarded ? ' discarded' : '') +
+      (tab.audible ? ' audible' : '') +
+      (tab.muted ? ' muted' : '');
     el.title = tab.url;
 
     if (tab.pinned) {
@@ -442,7 +470,7 @@
       // Busy pages fire many state pushes in quick succession; a tab whose
       // own visible fields haven't actually changed shouldn't have its
       // content wiped and rebuilt just because SOME tab's state changed.
-      var sig = [tab.id === state.activeId, tab.pinned, tab.loading, tab.title, tab.url].join('\u0001');
+      var sig = [tab.id === state.activeId, tab.pinned, tab.loading, tab.title, tab.url, tab.discarded, tab.audible, tab.muted].join('\u0001');
       if (tabSigById[tab.id] !== sig) {
         tabSigById[tab.id] = sig;
         updateTabElement(el, tab);
@@ -625,6 +653,7 @@
     closeAllMenus();
     contextTabId = tab.id;
     document.getElementById('ctxPin').textContent = tab.pinned ? 'Unpin tab' : 'Pin tab';
+    document.getElementById('ctxMute').textContent = tab.muted ? 'Unmute tab' : 'Mute tab';
     tabContextMenu.style.top = (y + 2) + 'px';
     tabContextMenu.style.left = x + 'px';
     tabContextMenu.style.right = '';
@@ -651,6 +680,7 @@
   document.getElementById('menuSettings').addEventListener('click', function () { window.api.createTab('daybreak://settings'); closeAllMenus(); });
   document.getElementById('menuAbout').addEventListener('click', function () { window.api.createTab('daybreak://about'); closeAllMenus(); });
   document.getElementById('menuFind').addEventListener('click', function () { openFindBar(); closeAllMenus(); });
+  document.getElementById('menuViewSource').addEventListener('click', function () { if (state.activeId) window.api.viewSource(state.activeId); closeAllMenus(); });
   document.getElementById('menuZoomIn').addEventListener('click', function () { if (state.activeId) window.api.zoomIn(state.activeId); closeAllMenus(); });
   document.getElementById('menuZoomOut').addEventListener('click', function () { if (state.activeId) window.api.zoomOut(state.activeId); closeAllMenus(); });
   document.getElementById('menuZoomReset').addEventListener('click', function () { if (state.activeId) window.api.zoomReset(state.activeId); closeAllMenus(); });
@@ -664,10 +694,25 @@
   document.getElementById('ctxReload').addEventListener('click', function () { if (contextTabId) window.api.reload(contextTabId); closeAllMenus(); });
   document.getElementById('ctxDuplicate').addEventListener('click', function () { if (contextTabId) window.api.duplicateTab(contextTabId); closeAllMenus(); });
   document.getElementById('ctxPin').addEventListener('click', function () { if (contextTabId) window.api.togglePinTab(contextTabId); closeAllMenus(); });
+  document.getElementById('ctxMute').addEventListener('click', function () { if (contextTabId) window.api.toggleMuteTab(contextTabId); closeAllMenus(); });
   document.getElementById('ctxCloseOthers').addEventListener('click', function () { if (contextTabId) window.api.closeOtherTabs(contextTabId); closeAllMenus(); });
   document.getElementById('ctxClose').addEventListener('click', function () { if (contextTabId) window.api.closeTab(contextTabId); closeAllMenus(); });
 
   // ---- find in page ----
+  var lastFindQuery = '';
+  var findDebounce = null;
+
+  function doFind(forward) {
+    var q = findInput.value;
+    if (!q || !state.activeId) return;
+    if (q !== lastFindQuery) {
+      lastFindQuery = q;
+      window.api.findStart(state.activeId, q, forward);
+    } else {
+      window.api.findNext(state.activeId, q, forward);
+    }
+  }
+
   function openFindBar() {
     findBar.classList.add('show');
     findInput.focus();
@@ -678,6 +723,8 @@
     if (!findBar.classList.contains('show')) return;
     findBar.classList.remove('show');
     findCount.textContent = '';
+    lastFindQuery = '';
+    if (findDebounce) { clearTimeout(findDebounce); findDebounce = null; }
     if (state.activeId) window.api.findStop(state.activeId);
     shrinkOverlayIfIdle();
   }
@@ -686,12 +733,31 @@
     if (!r || !r.tabId || r.tabId !== state.activeId) return;
     findCount.textContent = r.matches ? (r.activeMatch + ' of ' + r.matches) : 'No results';
   });
-  findInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && state.activeId) window.api.findStart(state.activeId, findInput.value, !e.shiftKey);
-    else if (e.key === 'Escape') closeFindBar();
+  findInput.addEventListener('input', function () {
+    if (findDebounce) clearTimeout(findDebounce);
+    if (!findInput.value) {
+      lastFindQuery = '';
+      findCount.textContent = '';
+      if (state.activeId) window.api.findStop(state.activeId);
+      return;
+    }
+    // Search live as you type, lightly debounced so fast typing doesn't
+    // fire a findInPage call on every single keystroke.
+    findDebounce = setTimeout(function () {
+      lastFindQuery = findInput.value; // a fresh query always restarts, never "advances"
+      if (state.activeId) window.api.findStart(state.activeId, findInput.value, true);
+    }, 120);
   });
-  document.getElementById('findPrev').addEventListener('click', function () { if (state.activeId) window.api.findNext(state.activeId, findInput.value, false); });
-  document.getElementById('findNext').addEventListener('click', function () { if (state.activeId) window.api.findStart(state.activeId, findInput.value, true); });
+  findInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      if (findDebounce) { clearTimeout(findDebounce); findDebounce = null; }
+      doFind(!e.shiftKey);
+    } else if (e.key === 'Escape') {
+      closeFindBar();
+    }
+  });
+  document.getElementById('findPrev').addEventListener('click', function () { doFind(false); });
+  document.getElementById('findNext').addEventListener('click', function () { doFind(true); });
   document.getElementById('findClose').addEventListener('click', closeFindBar);
 
   // ---- manual window drag (tab row) ----

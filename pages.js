@@ -228,6 +228,8 @@ function settingsPage() {
     <h1>Settings</h1>
     <div class="row"><div class="main"><div class="title">Block ads &amp; trackers</div><div class="url">Blocks known ad/tracker domains across all tabs</div></div>
       <input type="checkbox" id="adBlockEnabled"></div>
+    <div class="row"><div class="main"><div class="title">Memory Saver</div><div class="url">Frees background tabs left unused for a while; they reload automatically when revisited</div></div>
+      <input type="checkbox" id="memorySaverEnabled"></div>
     <div class="row"><div class="main"><div class="title">Homepage / new tab</div></div>
       <input type="text" id="homepage" style="max-width:280px" placeholder="daybreak://newtab"></div>
     <div class="row"><div class="main"><div class="title">Default search engine</div></div>
@@ -252,6 +254,7 @@ function settingsPage() {
     function load() {
       window.internalAPI.getSettings().then(function (s) {
         document.getElementById('adBlockEnabled').checked = s.adBlockEnabled !== false;
+        document.getElementById('memorySaverEnabled').checked = s.memorySaverEnabled !== false;
         document.getElementById('homepage').value = s.homepage || 'daybreak://newtab';
         document.getElementById('searchEngine').value = s.searchEngine || 'google';
         document.getElementById('showBookmarksBar').checked = !!s.showBookmarksBar;
@@ -262,6 +265,7 @@ function settingsPage() {
     document.getElementById('saveBtn').addEventListener('click', function () {
       window.internalAPI.setSettings({
         adBlockEnabled: document.getElementById('adBlockEnabled').checked,
+        memorySaverEnabled: document.getElementById('memorySaverEnabled').checked,
         homepage: document.getElementById('homepage').value.trim() || 'daybreak://newtab',
         searchEngine: document.getElementById('searchEngine').value,
         showBookmarksBar: document.getElementById('showBookmarksBar').checked,
@@ -349,4 +353,20 @@ function aboutPage() {
   return shell('About', body, '');
 }
 
-module.exports = { newTabPage, bookmarksPage, historyPage, settingsPage, downloadsPage, aboutPage };
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function viewSourcePage(url, html) {
+  const body = `
+    <h1 style="word-break:break-all">Source of ${escapeHtml(url || '')}</h1>
+    <pre style="white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Consolas,Menlo,monospace;
+                font-size:12px;line-height:1.5;background:var(--panel);border:1px solid var(--border);
+                border-radius:8px;padding:16px;margin:0">${escapeHtml(html || '')}</pre>
+  `;
+  return shell('View Source', body, '');
+}
+
+module.exports = { newTabPage, bookmarksPage, historyPage, settingsPage, downloadsPage, aboutPage, viewSourcePage };
