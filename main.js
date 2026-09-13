@@ -4,6 +4,11 @@ const fs = require('fs');
 const { randomUUID } = require('crypto');
 const pages = require('./pages.js');
 
+// A fully self-contained static page (its own theme system, its own
+// localStorage-backed persistence) — unlike the other internal pages, it
+// doesn't need generating per request, just loading once.
+const TWOFA_HTML = fs.readFileSync(path.join(__dirname, 'twofa.html'), 'utf8');
+
 // Most of what shows up in the terminal when running via `npm start` is
 // Chromium's own low-level network-stack logging (STUN lookups failing for
 // ad-network hosts that are now blocked, SSL handshake noise from those
@@ -728,7 +733,7 @@ function setupDownloads() {
 app.whenReady().then(() => {
   protocol.handle('daybreak', (request) => {
     const url = new URL(request.url);
-    const host = url.hostname;
+    const host = url.hostname.toLowerCase();
     let html;
     if (host === 'newtab' || host === 'home' || host === '') html = pages.newTabPage();
     else if (host === 'bookmarks') html = pages.bookmarksPage();
@@ -737,6 +742,8 @@ app.whenReady().then(() => {
     else if (host === 'downloads') html = pages.downloadsPage();
     else if (host === 'about') html = pages.aboutPage();
     else if (host === 'view-source') html = pages.viewSourcePage(lastViewSource.url, lastViewSource.html);
+    else if (host === 'apps') html = pages.appsPage();
+    else if (host === '2fa') html = TWOFA_HTML;
     else return new Response('Not found', { status: 404 });
 
     return new Response(html, { headers: { 'content-type': 'text/html' } });

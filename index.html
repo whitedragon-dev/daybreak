@@ -229,21 +229,27 @@
 
   /* =============== floating menus =============== */
   .floating-menu {
-    position: fixed; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2); min-width: 190px; z-index: 9999;
-    padding: 6px 0; opacity: 0; transform: translateY(-6px) scale(.98); pointer-events: none;
+    position: fixed; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.22); min-width: 220px; z-index: 9999;
+    padding: 8px; opacity: 0; transform: translateY(-6px) scale(.98); pointer-events: none;
     transition: opacity .12s ease, transform .12s ease;
   }
   .floating-menu.show { opacity: 1; transform: none; pointer-events: auto; }
   .menu-item {
-    padding: 9px 14px; font-size: 12px; color: var(--text); cursor: pointer;
-    display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    transition: background-color .1s ease;
+    padding: 7px 8px; font-size: 12.5px; color: var(--text); cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    border-radius: 7px; transition: background-color .1s ease;
   }
   .menu-item:hover { background: var(--hover); }
   .menu-item.danger { color: var(--danger); }
-  .menu-item span { color: var(--text-dim); font-size: 11px; }
-  .menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .menu-item .mi-icon {
+    width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10.5px; font-weight: 700; color: #fff;
+  }
+  .menu-item .mi-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .menu-item .mi-shortcut { color: var(--text-dim); font-size: 10.5px; flex-shrink: 0; }
+  .menu-divider { height: 1px; background: var(--border); margin: 6px 4px; }
 </style>
 </head>
 <body>
@@ -285,32 +291,34 @@
   </div>
 
   <div id="menuDropdown" class="floating-menu">
-    <div class="menu-item" id="menuNewTab">New tab<span>Ctrl+T</span></div>
+    <div class="menu-item" id="menuNewTab"><span class="mi-icon" style="background:#1a73e8">+</span><span class="mi-label">New tab</span><span class="mi-shortcut">Ctrl+T</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menuBookmarks">Bookmarks</div>
-    <div class="menu-item" id="menuHistory">History</div>
-    <div class="menu-item" id="menuDownloads">Downloads</div>
-    <div class="menu-item" id="menuFind">Find in page<span>Ctrl+F</span></div>
-    <div class="menu-item" id="menuViewSource">View page source<span>Ctrl+U</span></div>
+    <div class="menu-item" id="menuBookmarks"><span class="mi-icon" style="background:#f9ab00">&#9733;</span><span class="mi-label">Bookmarks</span></div>
+    <div class="menu-item" id="menuHistory"><span class="mi-icon" style="background:#9334e6">H</span><span class="mi-label">History</span></div>
+    <div class="menu-item" id="menuDownloads"><span class="mi-icon" style="background:#1e8e3e">&#8595;</span><span class="mi-label">Downloads</span></div>
+    <div class="menu-item" id="menuApps"><span class="mi-icon" style="background:#e8710a">A</span><span class="mi-label">Apps</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menuZoomOut">Zoom out<span>Ctrl+-</span></div>
-    <div class="menu-item" id="menuZoomReset">Reset zoom<span>Ctrl+0</span></div>
-    <div class="menu-item" id="menuZoomIn">Zoom in<span>Ctrl++</span></div>
+    <div class="menu-item" id="menuFind"><span class="mi-icon" style="background:#d93025">F</span><span class="mi-label">Find in page</span><span class="mi-shortcut">Ctrl+F</span></div>
+    <div class="menu-item" id="menuViewSource"><span class="mi-icon" style="background:#5f6368">S</span><span class="mi-label">View page source</span><span class="mi-shortcut">Ctrl+U</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menuSettings">Settings</div>
-    <div class="menu-item" id="menuToggleBar">Show bookmarks bar<span id="menuBarCheck"></span></div>
+    <div class="menu-item" id="menuZoomOut"><span class="mi-icon" style="background:#5f6368">&#8722;</span><span class="mi-label">Zoom out</span><span class="mi-shortcut">Ctrl+-</span></div>
+    <div class="menu-item" id="menuZoomReset"><span class="mi-icon" style="background:#5f6368">%</span><span class="mi-label">Reset zoom</span><span class="mi-shortcut">Ctrl+0</span></div>
+    <div class="menu-item" id="menuZoomIn"><span class="mi-icon" style="background:#5f6368">+</span><span class="mi-label">Zoom in</span><span class="mi-shortcut">Ctrl++</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menuAbout">About Daybreak</div>
+    <div class="menu-item" id="menuSettings"><span class="mi-icon" style="background:#5f6368">&#9881;</span><span class="mi-label">Settings</span></div>
+    <div class="menu-item" id="menuToggleBar"><span class="mi-icon" style="background:#5f6368">&#9638;</span><span class="mi-label">Show bookmarks bar</span><span class="mi-shortcut" id="menuBarCheck"></span></div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" id="menuAbout"><span class="mi-icon" style="background:#1a73e8">i</span><span class="mi-label">About Daybreak</span></div>
   </div>
 
   <div id="tabContextMenu" class="floating-menu">
-    <div class="menu-item" id="ctxReload">Reload</div>
-    <div class="menu-item" id="ctxDuplicate">Duplicate tab</div>
-    <div class="menu-item" id="ctxPin">Pin tab</div>
-    <div class="menu-item" id="ctxMute">Mute tab</div>
+    <div class="menu-item" id="ctxReload"><span class="mi-icon" style="background:#5f6368">&#8635;</span><span class="mi-label">Reload</span></div>
+    <div class="menu-item" id="ctxDuplicate"><span class="mi-icon" style="background:#5f6368">D</span><span class="mi-label">Duplicate tab</span></div>
+    <div class="menu-item" id="ctxPin"><span class="mi-icon" style="background:#5f6368">P</span><span class="mi-label">Pin tab</span></div>
+    <div class="menu-item" id="ctxMute"><span class="mi-icon" style="background:#5f6368">&#9834;</span><span class="mi-label">Mute tab</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="ctxCloseOthers">Close other tabs</div>
-    <div class="menu-item danger" id="ctxClose">Close tab<span>Ctrl+W</span></div>
+    <div class="menu-item" id="ctxCloseOthers"><span class="mi-icon" style="background:#5f6368">&#10005;</span><span class="mi-label">Close other tabs</span></div>
+    <div class="menu-item danger" id="ctxClose"><span class="mi-icon" style="background:var(--danger)">&#10005;</span><span class="mi-label">Close tab</span><span class="mi-shortcut">Ctrl+W</span></div>
   </div>
 
 <script>
@@ -652,8 +660,8 @@
   function openTabContextMenu(tab, x, y) {
     closeAllMenus();
     contextTabId = tab.id;
-    document.getElementById('ctxPin').textContent = tab.pinned ? 'Unpin tab' : 'Pin tab';
-    document.getElementById('ctxMute').textContent = tab.muted ? 'Unmute tab' : 'Mute tab';
+    document.getElementById('ctxPin').querySelector('.mi-label').textContent = tab.pinned ? 'Unpin tab' : 'Pin tab';
+    document.getElementById('ctxMute').querySelector('.mi-label').textContent = tab.muted ? 'Unmute tab' : 'Mute tab';
     tabContextMenu.style.top = (y + 2) + 'px';
     tabContextMenu.style.left = x + 'px';
     tabContextMenu.style.right = '';
@@ -677,6 +685,7 @@
   document.getElementById('menuBookmarks').addEventListener('click', function () { window.api.createTab('daybreak://bookmarks'); closeAllMenus(); });
   document.getElementById('menuHistory').addEventListener('click', function () { window.api.createTab('daybreak://history'); closeAllMenus(); });
   document.getElementById('menuDownloads').addEventListener('click', function () { window.api.createTab('daybreak://downloads'); closeAllMenus(); });
+  document.getElementById('menuApps').addEventListener('click', function () { window.api.createTab('daybreak://apps'); closeAllMenus(); });
   document.getElementById('menuSettings').addEventListener('click', function () { window.api.createTab('daybreak://settings'); closeAllMenus(); });
   document.getElementById('menuAbout').addEventListener('click', function () { window.api.createTab('daybreak://about'); closeAllMenus(); });
   document.getElementById('menuFind').addEventListener('click', function () { openFindBar(); closeAllMenus(); });

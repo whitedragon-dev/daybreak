@@ -19,9 +19,11 @@ from a genuine registered `daybreak://` protocol.
 - `tab-preload.js` — restricted context-bridge exposed only to internal
   `daybreak://` pages (`window.internalAPI`); regular websites never see it
 - `pages.js` — HTML generators for the internal pages: new tab, bookmarks,
-  history, downloads, settings, about
+  history, downloads, settings, about, apps
 - `index.html` — the overlay UI itself: tab strip, address bar, menus,
   find bar
+- `twofa.html` — a self-contained bundled app (local TOTP authenticator),
+  served as-is at `daybreak://2fa`; the first entry in the Apps hub
 
 ---
 
@@ -73,13 +75,23 @@ mechanism available to build a custom set of edge/corner handles.
 ### Internal pages
 
 `daybreak://` is registered as a real, privileged scheme (`newtab`,
-`bookmarks`, `history`, `downloads`, `settings`, `about`), handled by
-`protocol.handle` in the main process — the same mechanism a browser
+`bookmarks`, `history`, `downloads`, `settings`, `about`, `apps`), handled
+by `protocol.handle` in the main process — the same mechanism a browser
 would use for its own `chrome://`-style pages, not a special-cased string
 inside a tab. Each tab's `WebContentsView` loads `tab-preload.js`, which
 only exposes `window.internalAPI` when `location.protocol === 'daybreak:'`
 — an ordinary website loaded in a tab never gets access to bookmarks,
 history, or settings, regardless of what it tries to call.
+
+### Apps
+
+`daybreak://apps` is a small hub for self-contained bundled tools, listed
+in `pages.js`'s `APPS` array — adding a new one later is just adding an
+entry there plus its route in `protocol.handle`. Unlike the generated
+pages, an app is typically its own complete static HTML file (like
+`twofa.html`) with its own styling and its own `localStorage`-backed
+persistence, served as-is rather than templated through `shell()`. The
+hub is reachable from the new tab page and from the main menu.
 
 ### State updates
 

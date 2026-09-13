@@ -74,6 +74,20 @@ const BASE_STYLE = `
   button.action.danger { background: var(--danger); }
   .progress-track { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; margin-top: 4px; width: 160px; }
   .progress-fill { height: 100%; background: var(--accent); }
+  .apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .app-card {
+    display: block; text-decoration: none; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px; transition: border-color .12s ease, transform .12s ease;
+  }
+  .app-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .app-card-mark {
+    width: 30px; height: 30px; border-radius: 8px; background: var(--accent);
+    margin-bottom: 12px; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; color: #fff;
+  }
+  .app-card-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .app-card-desc { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
 `;
 
 // Applied first in every internal page so the overlay's theme choice carries
@@ -112,6 +126,9 @@ function newTabPage() {
       <div class="toolbar" style="width:100%;max-width:520px">
         <input type="search" id="q" placeholder="Search or enter address" autofocus>
       </div>
+      <a href="daybreak://apps" style="margin-top:14px;font-size:11px;color:var(--text-dim);text-decoration:none;
+         border:1px solid var(--border);border-radius:999px;padding:5px 14px;transition:border-color .12s ease"
+         onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">Apps</a>
       <div id="tiles" style="width:100%;max-width:520px;margin-top:28px"></div>
     </div>
   `;
@@ -369,4 +386,38 @@ function viewSourcePage(url, html) {
   return shell('View Source', body, '');
 }
 
-module.exports = { newTabPage, bookmarksPage, historyPage, settingsPage, downloadsPage, aboutPage, viewSourcePage };
+// Small self-contained tools bundled into Daybreak, reachable from the new
+// tab page and the Apps hub. Add an entry here (and its route in main.js's
+// protocol.handle) for anything added later — nothing else needs to change.
+const APPS = [
+  {
+    id: 'authenticator',
+    name: 'Authenticator',
+    mark: '2F',
+    description: 'Local two-factor authentication codes. Everything stays on this device.',
+    url: 'daybreak://2fa'
+  }
+];
+
+function appCardHtml(app) {
+  return `
+    <a class="app-card" href="${app.url}">
+      <div class="app-card-mark">${escapeHtml(app.mark || app.name[0])}</div>
+      <div class="app-card-name">${escapeHtml(app.name)}</div>
+      <div class="app-card-desc">${escapeHtml(app.description)}</div>
+    </a>
+  `;
+}
+
+function appsPage() {
+  const body = `
+    <h1>Apps</h1>
+    <p style="color:var(--text-dim);font-size:12px;margin:-10px 0 20px">
+      Small self-contained tools built into Daybreak. More will show up here over time.
+    </p>
+    <div class="apps-grid">${APPS.map(appCardHtml).join('')}</div>
+  `;
+  return shell('Apps', body, '');
+}
+
+module.exports = { newTabPage, bookmarksPage, historyPage, settingsPage, downloadsPage, aboutPage, viewSourcePage, appsPage, APPS };
