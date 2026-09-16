@@ -7,7 +7,7 @@ const pages = require('./pages.js');
 // A fully self-contained static page (its own theme system, its own
 // localStorage-backed persistence) — unlike the other internal pages, it
 // doesn't need generating per request, just loading once.
-const TWOFA_HTML = fs.readFileSync(path.join(__dirname, 'twofa.html'), 'utf8');
+const TWOFA_HTML = fs.readFileSync(path.join(__dirname, '2FA.html'), 'utf8');
 
 // Most of what shows up in the terminal when running via `npm start` is
 // Chromium's own low-level network-stack logging (STUN lookups failing for
@@ -152,7 +152,8 @@ function serializeState() {
         canGoForward: wc ? wc.navigationHistory.canGoForward() : false,
         bookmarked: bookmarks.some((b) => b.url === tab.url),
         audible: wc ? safeCall(() => wc.isCurrentlyAudible(), false) : false,
-        muted: wc ? safeCall(() => wc.isAudioMuted(), false) : false
+        muted: wc ? safeCall(() => wc.isAudioMuted(), false) : false,
+        favicon: tab.favicon || null
       };
     })
   };
@@ -399,6 +400,7 @@ function attachTabListeners(id, tab) {
 
   wc.on('did-navigate', (_e, navUrl) => {
     tab.url = navUrl;
+    tab.favicon = null;
     if (/^https?:\/\//i.test(navUrl)) {
       const entry = { id: randomUUID(), url: navUrl, title: '', timestamp: Date.now() };
       history.push(entry);
@@ -428,6 +430,10 @@ function attachTabListeners(id, tab) {
   // Drives the tab-strip mute/speaker indicator.
   wc.on('media-started-playing', () => pushState());
   wc.on('media-paused', () => pushState());
+  wc.on('page-favicon-updated', (_e, favicons) => {
+    tab.favicon = (favicons && favicons[0]) || null;
+    pushState();
+  });
 
   wc.on('before-input-event', (_e, input) => handleShortcut(input, id));
   wc.on('context-menu', (_e, params) => { buildPageContextMenu(wc, params, id).popup({ window: win }); });
@@ -914,9 +920,9 @@ ipcMain.handle('zoom:reset', (_e, id) => {
 // ---------------- IPC: bookmarks ----------------
 
 ipcMain.handle('bookmarks:list', () => bookmarks);
-ipcMain.handle('bookmarks:add', (_e, { url, title }) => {
+ipcMain.handle('bookmarks:add', (_e, { url, title, favicon }) => {
   if (!bookmarks.some((b) => b.url === url)) {
-    bookmarks.push({ id: randomUUID(), url, title: title || url, timestamp: Date.now() });
+    bookmarks.push({ id: randomUUID(), url, title: title || url, favicon: favicon || null, timestamp: Date.now() });
     saveBookmarks();
     pushState();
   }

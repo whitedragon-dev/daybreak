@@ -45,7 +45,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // bookmarks
   getBookmarks: () => ipcRenderer.invoke('bookmarks:list'),
-  addBookmark: (url, title) => ipcRenderer.invoke('bookmarks:add', { url, title }),
+  addBookmark: (url, title, favicon) => ipcRenderer.invoke('bookmarks:add', { url, title, favicon }),
   removeBookmark: (id) => ipcRenderer.invoke('bookmarks:remove', id),
   removeBookmarkByUrl: (url) => ipcRenderer.invoke('bookmarks:removeByUrl', url),
 

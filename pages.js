@@ -119,17 +119,35 @@ ${script}</script>
 
 function newTabPage() {
   const body = `
-    <div style="display:flex;flex-direction:column;align-items:center;padding-top:12vh">
-      <div style="width:46px;height:46px;border-radius:50%;border:2px solid var(--accent);
-                  border-bottom-color:transparent;transform:rotate(-45deg);margin-bottom:18px"></div>
-      <div style="font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:26px">Daybreak</div>
-      <div class="toolbar" style="width:100%;max-width:520px">
-        <input type="search" id="q" placeholder="Search or enter address" autofocus>
+    <div style="display:flex;flex-direction:column;align-items:center;padding-top:11vh">
+      <div style="width:40px;height:40px;border-radius:50%;border:2px solid var(--accent);
+                  border-bottom-color:transparent;transform:rotate(-45deg);margin-bottom:22px"></div>
+      <div id="greeting" style="font-size:26px;font-weight:600;letter-spacing:-.02em;margin-bottom:30px;color:var(--text)"></div>
+
+      <div style="width:100%;max-width:540px;position:relative">
+        <input type="search" id="q" placeholder="Search or enter address" autofocus
+          style="width:100%;box-sizing:border-box;padding:14px 18px;border:1px solid var(--border);border-radius:999px;
+                 font-size:14px;outline:none;color:var(--text);background:var(--panel);transition:border-color .12s ease,box-shadow .12s ease">
       </div>
-      <a href="daybreak://apps" style="margin-top:14px;font-size:11px;color:var(--text-dim);text-decoration:none;
-         border:1px solid var(--border);border-radius:999px;padding:5px 14px;transition:border-color .12s ease"
-         onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">Apps</a>
-      <div id="tiles" style="width:100%;max-width:520px;margin-top:28px"></div>
+
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <a href="daybreak://apps" style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-dim);text-decoration:none;
+           border:1px solid var(--border);border-radius:999px;padding:6px 14px 6px 12px;transition:border-color .12s ease,color .12s ease"
+           onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text)'"
+           onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+            <rect x="4" y="4" width="7" height="7" rx="1.3"/><rect x="13" y="4" width="7" height="7" rx="1.3"/>
+            <rect x="4" y="13" width="7" height="7" rx="1.3"/><rect x="13" y="13" width="7" height="7" rx="1.3"/>
+          </svg>
+          Apps
+        </a>
+      </div>
+
+      <div style="width:100%;max-width:540px;margin-top:36px">
+        <div id="tilesLabel" style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;
+             margin:0 0 10px 2px;display:none">Frequently visited</div>
+        <div id="tiles"></div>
+      </div>
     </div>
   `;
   const script = `
@@ -139,6 +157,8 @@ function newTabPage() {
       duckduckgo: 'https://duckduckgo.com/?q='
     };
     var q = document.getElementById('q');
+    q.addEventListener('focus', function () { q.style.borderColor = 'var(--accent)'; });
+    q.addEventListener('blur', function () { q.style.borderColor = 'var(--border)'; });
     q.addEventListener('keydown', function (e) {
       if (e.key !== 'Enter') return;
       var val = q.value.trim();
@@ -151,28 +171,41 @@ function newTabPage() {
       });
     });
 
+    (function () {
+      var h = new Date().getHours();
+      var greeting = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+      document.getElementById('greeting').textContent = greeting;
+    })();
+
     function hueFor(str) {
       var h = 0;
       for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
       return h;
     }
-    function tile(url, title) {
+    function tile(url, title, favicon) {
       var host = '';
-      try { host = new URL(url).hostname.replace(/^www\\./, ''); } catch (e) { host = url; }
+      try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) { host = url; }
       var letter = (host[0] || '?').toUpperCase();
       var hue = hueFor(host);
-      return '<a href="' + url + '" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px" ' +
-        'onmouseover="this.style.background=\\'var(--hover)\\'" onmouseout="this.style.background=\\'\\'">' +
-        '<div style="width:30px;height:30px;flex-shrink:0;border-radius:7px;display:flex;align-items:center;justify-content:center;' +
-          'background:hsl(' + hue + ',55%,45%);color:#fff;font-size:13px;font-weight:600">' + letter + '</div>' +
+      var iconHtml = favicon
+        ? '<img src="' + favicon + '" alt="" style="width:30px;height:30px;flex-shrink:0;border-radius:7px;object-fit:cover" onerror="this.remove()">'
+        : '<div style="width:30px;height:30px;flex-shrink:0;border-radius:7px;display:flex;align-items:center;justify-content:center;' +
+            'background:hsl(' + hue + ',55%,45%);color:#fff;font-size:13px;font-weight:600">' + letter + '</div>';
+      return '<a href="' + url + '" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:10px;' +
+        'padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--panel);' +
+        'transition:border-color .12s ease,transform .12s ease" ' +
+        'onmouseover="this.style.borderColor=\\'var(--accent)\\';this.style.transform=\\'translateY(-1px)\\'" ' +
+        'onmouseout="this.style.borderColor=\\'var(--border)\\';this.style.transform=\\'none\\'">' +
+        iconHtml +
         '<div style="min-width:0"><div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (title || host) + '</div>' +
         '<div style="font-size:10px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + host + '</div></div></a>';
     }
     window.internalAPI.getBookmarks().then(function (list) {
       var el = document.getElementById('tiles');
       if (!list.length) return;
-      el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">' +
-        list.slice(-8).reverse().map(function (b) { return tile(b.url, b.title); }).join('') + '</div>';
+      document.getElementById('tilesLabel').style.display = 'block';
+      el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">' +
+        list.slice(-9).reverse().map(function (b) { return tile(b.url, b.title, b.favicon); }).join('') + '</div>';
     });
   `;
   return shell('New Tab', body, script);
@@ -188,7 +221,10 @@ function bookmarksPage() {
       var el = document.getElementById('list');
       if (!list.length) { el.innerHTML = '<div class="empty">No bookmarks yet</div>'; return; }
       el.innerHTML = list.slice().reverse().map(function (b) {
-        return '<div class="row"><div class="main"><a class="title-link" href="' + b.url + '"><div class="title">' + (b.title || b.url) + '</div><div class="url">' + b.url + '</div></a></div>' +
+        var icon = b.favicon
+          ? '<img src="' + b.favicon + '" alt="" style="width:16px;height:16px;border-radius:3px;flex-shrink:0" onerror="this.remove()">'
+          : '<span style="width:16px;height:16px;border-radius:3px;flex-shrink:0;background:var(--border);display:inline-block"></span>';
+        return '<div class="row"><div class="main" style="display:flex;align-items:center;gap:10px"><a class="title-link" style="display:flex;align-items:center;gap:10px;min-width:0;flex:1" href="' + b.url + '">' + icon + '<span style="min-width:0"><div class="title">' + (b.title || b.url) + '</div><div class="url">' + b.url + '</div></span></a></div>' +
           '<button class="icon-btn" data-id="' + b.id + '">Remove</button></div>';
       }).join('');
       el.querySelectorAll('button[data-id]').forEach(function (btn) {

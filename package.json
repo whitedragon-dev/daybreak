@@ -24,7 +24,7 @@
       "tab-preload.js",
       "pages.js",
       "index.html",
-      "twofa.html",
+      "2FA.html",
       "package.json"
     ],
     "directories": {

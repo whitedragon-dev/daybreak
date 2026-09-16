@@ -101,6 +101,9 @@
     font-size: 10px; font-weight: 600; color: #fff;
   }
   .tab.pinned .tab-monogram { display: flex; }
+  .tab .tab-favicon { display: none; width: 14px; height: 14px; border-radius: 2px; flex-shrink: 0; }
+  .tab.has-favicon:not(.loading) .tab-favicon { display: block; }
+  .tab.has-favicon.pinned:not(.loading) .tab-monogram { display: none; }
   .tab .tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; pointer-events: none; font-size: 12px; }
   .tab.pinned .tab-title, .tab.pinned .tab-close { display: none; }
   .tab .tab-spinner {
@@ -206,6 +209,7 @@
     transition: background-color .1s ease;
   }
   .bm-chip:hover { background: var(--hover); }
+  .bm-chip-icon { width: 13px; height: 13px; border-radius: 2px; flex-shrink: 0; }
   .bm-empty { font-size: 11px; color: var(--text-dim); padding: 0 4px; }
 
   /* =============== find bar =============== */
@@ -243,10 +247,12 @@
   .menu-item:hover { background: var(--hover); }
   .menu-item.danger { color: var(--danger); }
   .menu-item .mi-icon {
-    width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0;
+    width: 16px; height: 16px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 10.5px; font-weight: 700; color: #fff;
+    color: var(--text-dim);
   }
+  .menu-item .mi-icon svg { width: 16px; height: 16px; display: block; }
+  .menu-item.danger .mi-icon { color: var(--danger); }
   .menu-item .mi-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .menu-item .mi-shortcut { color: var(--text-dim); font-size: 10.5px; flex-shrink: 0; }
   .menu-divider { height: 1px; background: var(--border); margin: 6px 4px; }
@@ -291,34 +297,34 @@
   </div>
 
   <div id="menuDropdown" class="floating-menu">
-    <div class="menu-item" id="menuNewTab"><span class="mi-icon" style="background:#1a73e8">+</span><span class="mi-label">New tab</span><span class="mi-shortcut">Ctrl+T</span></div>
+    <div class="menu-item" id="menuNewTab"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span><span class="mi-label">New tab</span><span class="mi-shortcut">Ctrl+T</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menuBookmarks"><span class="mi-icon" style="background:#f9ab00">&#9733;</span><span class="mi-label">Bookmarks</span></div>
-    <div class="menu-item" id="menuHistory"><span class="mi-icon" style="background:#9334e6">H</span><span class="mi-label">History</span></div>
-    <div class="menu-item" id="menuDownloads"><span class="mi-icon" style="background:#1e8e3e">&#8595;</span><span class="mi-label">Downloads</span></div>
-    <div class="menu-item" id="menuApps"><span class="mi-icon" style="background:#e8710a">A</span><span class="mi-label">Apps</span></div>
+    <div class="menu-item" id="menuBookmarks"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><polygon points="12 3 14.9 9.3 21.8 10 16.5 14.6 18 21.4 12 17.8 6 21.4 7.5 14.6 2.2 10 9.1 9.3"/></svg></span><span class="mi-label">Bookmarks</span></div>
+    <div class="menu-item" id="menuHistory"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><polyline points="12 7.5 12 12 15.5 14"/></svg></span><span class="mi-label">History</span></div>
+    <div class="menu-item" id="menuDownloads"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><polyline points="7.5 10 12 14.5 16.5 10"/><path d="M5 19h14"/></svg></span><span class="mi-label">Downloads</span></div>
+    <div class="menu-item" id="menuApps"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2"/></svg></span><span class="mi-label">Apps</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menuFind"><span class="mi-icon" style="background:#d93025">F</span><span class="mi-label">Find in page</span><span class="mi-shortcut">Ctrl+F</span></div>
-    <div class="menu-item" id="menuViewSource"><span class="mi-icon" style="background:#5f6368">S</span><span class="mi-label">View page source</span><span class="mi-shortcut">Ctrl+U</span></div>
+    <div class="menu-item" id="menuFind"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.3" y2="15.3"/></svg></span><span class="mi-label">Find in page</span><span class="mi-shortcut">Ctrl+F</span></div>
+    <div class="menu-item" id="menuViewSource"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="8.5 8 4 12 8.5 16"/><polyline points="15.5 8 20 12 15.5 16"/></svg></span><span class="mi-label">View page source</span><span class="mi-shortcut">Ctrl+U</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menuZoomOut"><span class="mi-icon" style="background:#5f6368">&#8722;</span><span class="mi-label">Zoom out</span><span class="mi-shortcut">Ctrl+-</span></div>
-    <div class="menu-item" id="menuZoomReset"><span class="mi-icon" style="background:#5f6368">%</span><span class="mi-label">Reset zoom</span><span class="mi-shortcut">Ctrl+0</span></div>
-    <div class="menu-item" id="menuZoomIn"><span class="mi-icon" style="background:#5f6368">+</span><span class="mi-label">Zoom in</span><span class="mi-shortcut">Ctrl++</span></div>
+    <div class="menu-item" id="menuZoomOut"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><line x1="7.5" y1="11" x2="14.5" y2="11"/><line x1="20" y1="20" x2="16.2" y2="16.2"/></svg></span><span class="mi-label">Zoom out</span><span class="mi-shortcut">Ctrl+-</span></div>
+    <div class="menu-item" id="menuZoomReset"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="12" r="8.5"/></svg></span><span class="mi-label">Reset zoom</span><span class="mi-shortcut">Ctrl+0</span></div>
+    <div class="menu-item" id="menuZoomIn"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><line x1="11" y1="7.5" x2="11" y2="14.5"/><line x1="7.5" y1="11" x2="14.5" y2="11"/><line x1="20" y1="20" x2="16.2" y2="16.2"/></svg></span><span class="mi-label">Zoom in</span><span class="mi-shortcut">Ctrl++</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menuSettings"><span class="mi-icon" style="background:#5f6368">&#9881;</span><span class="mi-label">Settings</span></div>
-    <div class="menu-item" id="menuToggleBar"><span class="mi-icon" style="background:#5f6368">&#9638;</span><span class="mi-label">Show bookmarks bar</span><span class="mi-shortcut" id="menuBarCheck"></span></div>
+    <div class="menu-item" id="menuSettings"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/></svg></span><span class="mi-label">Settings</span></div>
+    <div class="menu-item" id="menuToggleBar"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="3.5" rx="1"/><rect x="3.5" y="10.5" width="17" height="9" rx="1"/></svg></span><span class="mi-label">Show bookmarks bar</span><span class="mi-shortcut" id="menuBarCheck"></span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menuAbout"><span class="mi-icon" style="background:#1a73e8">i</span><span class="mi-label">About Daybreak</span></div>
+    <div class="menu-item" id="menuAbout"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><line x1="12" y1="16" x2="12" y2="11"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg></span><span class="mi-label">About Daybreak</span></div>
   </div>
 
   <div id="tabContextMenu" class="floating-menu">
-    <div class="menu-item" id="ctxReload"><span class="mi-icon" style="background:#5f6368">&#8635;</span><span class="mi-label">Reload</span></div>
-    <div class="menu-item" id="ctxDuplicate"><span class="mi-icon" style="background:#5f6368">D</span><span class="mi-label">Duplicate tab</span></div>
-    <div class="menu-item" id="ctxPin"><span class="mi-icon" style="background:#5f6368">P</span><span class="mi-label">Pin tab</span></div>
-    <div class="menu-item" id="ctxMute"><span class="mi-icon" style="background:#5f6368">&#9834;</span><span class="mi-label">Mute tab</span></div>
+    <div class="menu-item" id="ctxReload"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><polyline points="20 4 20 9 15 9"/></svg></span><span class="mi-label">Reload</span></div>
+    <div class="menu-item" id="ctxDuplicate"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><rect x="8" y="8" width="11" height="11" rx="1.5"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></svg></span><span class="mi-label">Duplicate tab</span></div>
+    <div class="menu-item" id="ctxPin"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="21.5"/><path d="M6 9a6 6 0 0 1 12 0c0 2.5-1.7 3.3-1.7 5H7.7C7.7 12.3 6 11.5 6 9z"/></svg></span><span class="mi-label">Pin tab</span></div>
+    <div class="menu-item" id="ctxMute"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="10.5 5 6 8.5 3 8.5 3 15.5 6 15.5 10.5 19"/><line x1="15" y1="9" x2="20.5" y2="14.5"/><line x1="20.5" y1="9" x2="15" y2="14.5"/></svg></span><span class="mi-label">Mute tab</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="ctxCloseOthers"><span class="mi-icon" style="background:#5f6368">&#10005;</span><span class="mi-label">Close other tabs</span></div>
-    <div class="menu-item danger" id="ctxClose"><span class="mi-icon" style="background:var(--danger)">&#10005;</span><span class="mi-label">Close tab</span><span class="mi-shortcut">Ctrl+W</span></div>
+    <div class="menu-item" id="ctxCloseOthers"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="17" y1="7" x2="7" y2="17"/><line x1="7" y1="7" x2="17" y2="17"/></svg></span><span class="mi-label">Close other tabs</span></div>
+    <div class="menu-item danger" id="ctxClose"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="17" y1="7" x2="7" y2="17"/><line x1="7" y1="7" x2="17" y2="17"/></svg></span><span class="mi-label">Close tab</span><span class="mi-shortcut">Ctrl+W</span></div>
   </div>
 
 <script>
@@ -392,6 +398,18 @@
     mono.className = 'tab-monogram';
     el.appendChild(mono);
 
+    var favicon = document.createElement('img');
+    favicon.className = 'tab-favicon';
+    favicon.alt = '';
+    // A favicon that fails to load (dead link, blocked host) should just
+    // fall back to the monogram/blank state rather than showing a broken
+    // image icon.
+    favicon.addEventListener('error', function () {
+      el.classList.remove('has-favicon');
+      favicon.removeAttribute('src');
+    });
+    el.appendChild(favicon);
+
     var spinner = document.createElement('span');
     spinner.className = 'tab-spinner';
     el.appendChild(spinner);
@@ -419,6 +437,7 @@
     el.appendChild(closeEl);
 
     el._mono = mono;
+    el._favicon = favicon;
     el._title = titleEl;
 
     el.addEventListener('click', function () {
@@ -451,8 +470,12 @@
       (tab.loading ? ' loading' : '') +
       (tab.discarded ? ' discarded' : '') +
       (tab.audible ? ' audible' : '') +
-      (tab.muted ? ' muted' : '');
+      (tab.muted ? ' muted' : '') +
+      (tab.favicon ? ' has-favicon' : '');
     el.title = tab.url;
+
+    if (tab.favicon && el._favicon.src !== tab.favicon) el._favicon.src = tab.favicon;
+    if (!tab.favicon) el._favicon.removeAttribute('src');
 
     if (tab.pinned) {
       var host = hostOf(tab.url);
@@ -478,7 +501,7 @@
       // Busy pages fire many state pushes in quick succession; a tab whose
       // own visible fields haven't actually changed shouldn't have its
       // content wiped and rebuilt just because SOME tab's state changed.
-      var sig = [tab.id === state.activeId, tab.pinned, tab.loading, tab.title, tab.url, tab.discarded, tab.audible, tab.muted].join('\u0001');
+      var sig = [tab.id === state.activeId, tab.pinned, tab.loading, tab.title, tab.url, tab.discarded, tab.audible, tab.muted, tab.favicon].join('\u0001');
       if (tabSigById[tab.id] !== sig) {
         tabSigById[tab.id] = sig;
         updateTabElement(el, tab);
@@ -564,11 +587,24 @@
     list.forEach(function (b) {
       var chip = document.createElement('div');
       chip.className = 'bm-chip';
-      chip.textContent = b.title || b.url;
       chip.title = b.url;
       chip.addEventListener('click', function () {
         if (state.activeId) window.api.navigate(state.activeId, b.url);
       });
+
+      if (b.favicon) {
+        var icon = document.createElement('img');
+        icon.className = 'bm-chip-icon';
+        icon.src = b.favicon;
+        icon.alt = '';
+        icon.addEventListener('error', function () { icon.remove(); });
+        chip.appendChild(icon);
+      }
+
+      var label = document.createElement('span');
+      label.textContent = b.title || b.url;
+      chip.appendChild(label);
+
       bookmarksBar.appendChild(chip);
     });
   }
@@ -603,7 +639,7 @@
     var active = activeTab();
     if (!active) return;
     if (active.bookmarked) window.api.removeBookmarkByUrl(active.url);
-    else window.api.addBookmark(active.url, active.title);
+    else window.api.addBookmark(active.url, active.title, active.favicon);
   });
 
   urlbar.addEventListener('focus', function () { editingUrl = true; });

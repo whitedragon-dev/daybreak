@@ -22,7 +22,7 @@ from a genuine registered `daybreak://` protocol.
   history, downloads, settings, about, apps
 - `index.html` — the overlay UI itself: tab strip, address bar, menus,
   find bar
-- `twofa.html` — a self-contained bundled app (local TOTP authenticator),
+- `2FA.html` — a self-contained bundled app (local TOTP authenticator),
   served as-is at `daybreak://2fa`; the first entry in the Apps hub
 
 ---
@@ -89,7 +89,7 @@ history, or settings, regardless of what it tries to call.
 in `pages.js`'s `APPS` array — adding a new one later is just adding an
 entry there plus its route in `protocol.handle`. Unlike the generated
 pages, an app is typically its own complete static HTML file (like
-`twofa.html`) with its own styling and its own `localStorage`-backed
+`2FA.html`) with its own styling and its own `localStorage`-backed
 persistence, served as-is rather than templated through `shell()`. The
 hub is reachable from the new tab page and from the main menu.
 
