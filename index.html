@@ -311,7 +311,7 @@
     <div class="menu-item" id="menuZoomReset"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="12" r="8.5"/></svg></span><span class="mi-label">Reset zoom</span><span class="mi-shortcut">Ctrl+0</span></div>
     <div class="menu-item" id="menuZoomIn"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><line x1="11" y1="7.5" x2="11" y2="14.5"/><line x1="7.5" y1="11" x2="14.5" y2="11"/><line x1="20" y1="20" x2="16.2" y2="16.2"/></svg></span><span class="mi-label">Zoom in</span><span class="mi-shortcut">Ctrl++</span></div>
     <div class="menu-divider"></div>
-    <div class="menu-item" id="menuSettings"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M2.5 12h3M18.5 12h3M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/></svg></span><span class="mi-label">Settings</span></div>
+    <div class="menu-item" id="menuSettings"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><circle cx="9" cy="7" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="11" cy="17" r="2"/></svg></span><span class="mi-label">Settings</span></div>
     <div class="menu-item" id="menuToggleBar"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="3.5" rx="1"/><rect x="3.5" y="10.5" width="17" height="9" rx="1"/></svg></span><span class="mi-label">Show bookmarks bar</span><span class="mi-shortcut" id="menuBarCheck"></span></div>
     <div class="menu-divider"></div>
     <div class="menu-item" id="menuAbout"><span class="mi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><line x1="12" y1="16" x2="12" y2="11"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg></span><span class="mi-label">About Daybreak</span></div>
@@ -334,6 +334,16 @@
   var contextTabId = null;
 
   var tabstrip = document.getElementById('tabstrip');
+  // A vertical scroll/wheel gesture doesn't natively scroll a horizontally
+  // overflowing element — real browsers translate it for their tab strip,
+  // so this does the same. Without this, tabs beyond the visible width
+  // were reachable in the DOM but the user had no way to actually get to
+  // them (no visible scrollbar, no drag-to-scroll).
+  tabstrip.addEventListener('wheel', function (e) {
+    if (e.deltaY === 0) return;
+    tabstrip.scrollLeft += e.deltaY;
+    e.preventDefault();
+  }, { passive: false });
   var urlbar = document.getElementById('urlbar');
   var backBtn = document.getElementById('backBtn');
   var fwdBtn = document.getElementById('fwdBtn');
@@ -486,6 +496,8 @@
     }
   }
 
+  var lastScrolledActiveId = null;
+
   function renderTabs() {
     // Don't let a background state push (another tab's spinner, etc.) fight
     // the live drag-reorder preview below — it would snap the dragged tab
@@ -511,6 +523,26 @@
     Object.keys(tabElById).forEach(function (id) {
       if (!seen[id]) { tabElById[id].remove(); delete tabElById[id]; delete tabSigById[id]; }
     });
+
+    // The tab strip scrolls once there isn't room for every tab (see the
+    // wheel handler below) — but a newly created or newly switched-to tab
+    // needs to actually be visible without the user first discovering they
+    // have to scroll to find it. Only do this on an actual active-tab
+    // change, not every render, so it doesn't fight someone deliberately
+    // scrolling to glance at a background tab.
+    if (state.activeId && state.activeId !== lastScrolledActiveId) {
+      lastScrolledActiveId = state.activeId;
+      var activeEl = tabElById[state.activeId];
+      if (activeEl) {
+        var stripRect = tabstrip.getBoundingClientRect();
+        var elRect = activeEl.getBoundingClientRect();
+        if (elRect.left < stripRect.left) {
+          tabstrip.scrollLeft -= (stripRect.left - elRect.left) + 8;
+        } else if (elRect.right > stripRect.right) {
+          tabstrip.scrollLeft += (elRect.right - stripRect.right) + 8;
+        }
+      }
+    }
   }
 
   // ---- tab drag-to-reorder ----
